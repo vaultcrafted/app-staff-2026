@@ -253,6 +253,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
 }
 
 function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica }){
+  const [openAvviso,setOpenAvviso]=useState(null);
   const upcoming=events.slice(0,6);
   const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
   const cl=classifica||[];
@@ -276,13 +277,14 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
       {bannerComs.length>0 && <div style={{marginBottom:18,display:"flex",flexDirection:"column",gap:10}}>
         {bannerComs.map(bc=>(
           <div key={bc.id} style={{background:C.amberSoft,border:"1px solid #f4d9a6",borderRadius:16,padding:14}}>
-            <div style={{display:"flex",gap:9}}>
+            <button onClick={()=>setOpenAvviso(bc)} style={{width:"100%",textAlign:"left",background:"transparent",border:"none",cursor:"pointer",padding:0,display:"flex",gap:9}}>
               <Bell size={17} color={C.amber} style={{flexShrink:0,marginTop:1}}/>
               <div style={{flex:1}}>
                 <p style={{margin:0,fontWeight:700,fontSize:14}}>{bc.titolo}</p>
                 {bc.corpo && <p style={{margin:"2px 0 0",fontSize:12.5,color:C.mut,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{bc.corpo}</p>}
+                {bc.corpo && <span style={{fontSize:11.5,color:C.amber,fontWeight:700,display:"inline-block",marginTop:3}}>Apri</span>}
               </div>
-            </div>
+            </button>
             <button onClick={()=>conferma(bc.id)} style={{...btnPrimary,width:"100%",marginTop:11,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>
           </div>))}
       </div>}
@@ -332,6 +334,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
            </div>); })}
         {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {myPunti} punti</div>}
       </div>
+      {openAvviso && <AvvisoModal c={openAvviso} confermato={!!letto[openAvviso.id]} onConferma={()=>conferma(openAvviso.id)} onClose={()=>setOpenAvviso(null)}/>}
     </div>
   );
 }
