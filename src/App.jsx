@@ -97,7 +97,7 @@ function OField({label,value,onChange,type,req,valid,placeholder,hint,options}){
     <div style={{marginBottom:12}}>
       <label style={lbl}>{label}{req?<span style={{color:"#d33"}}> *</span>:null}</label>
       {options
-        ? <select value={value} onChange={e=>onChange(e.target.value)} style={inp}><option value="">Seleziona\u2026</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>
+        ? <select value={value} onChange={e=>onChange(e.target.value)} style={inp}><option value="">Seleziona…</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>
         : <input type={type||"text"} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder||""} style={{...inp,borderColor:(req&&value&&!valid)?"#e0a0a0":C.border}}/>}
       {req&&value&&!valid&&hint?<p style={{color:"#d33",fontSize:11.5,margin:"4px 2px 0"}}>{hint}</p>:null}
     </div>
@@ -135,14 +135,14 @@ function Onboarding({ me, onDone, onLogout }){
           <h1 style={{...head,fontSize:28,fontWeight:800,margin:"6px 0 6px"}}>Benvenuto, {me.nome}!</h1>
           <p style={{color:C.mut,fontSize:14,lineHeight:1.5,margin:"0 0 16px"}}>Prima di entrare, controlla che i dati siano giusti e completa quelli mancanti. Ti serve una volta sola.</p>
           <div style={{background:ok?C.successSoft:C.amberSoft,border:`1px solid ${ok?"rgba(34,179,107,0.3)":"#f4d9a6"}`,borderRadius:12,padding:"10px 13px",marginBottom:18,fontSize:13.5,fontWeight:700,color:ok?"#177a4a":"#8a5a12"}}>
-            {ok?"Tutto pronto \u2014 puoi entrare.":`Mancano ${mancanti} ${mancanti===1?"dato":"dati"} da sistemare.`}
+            {ok?"Tutto pronto — puoi entrare.":`Mancano ${mancanti} ${mancanti===1?"dato":"dati"} da sistemare.`}
           </div>
           <div style={card}>
             <h3 style={{...sect,marginTop:0}}>I tuoi dati</h3>
             <OField label="Data di nascita" type="date" value={f.nascita} onChange={v=>set("nascita",v)} req valid={!!f.nascita}/>
             <OField label="Sesso" value={f.sesso} onChange={v=>set("sesso",v)} req valid={!!f.sesso} options={["Uomo","Donna"]}/>
-            <OField label="Citt\u00e0" value={f.citta} onChange={v=>set("citta",v)} req valid={!!f.citta.trim()} placeholder="Es. Torino"/>
-            <OField label="Indirizzo di casa" value={f.indirizzo} onChange={v=>set("indirizzo",v)} req valid={!!f.indirizzo.trim()} placeholder="Via, numero, citt\u00e0"/>
+            <OField label="Città" value={f.citta} onChange={v=>set("citta",v)} req valid={!!f.citta.trim()} placeholder="Es. Torino"/>
+            <OField label="Indirizzo di casa" value={f.indirizzo} onChange={v=>set("indirizzo",v)} req valid={!!f.indirizzo.trim()} placeholder="Via, numero, città"/>
             <OField label="Codice fiscale" value={f.codice_fiscale} onChange={v=>set("codice_fiscale",v.toUpperCase())} req valid={cfOk} hint="Deve avere 16 caratteri" placeholder="16 caratteri"/>
           </div>
           <div style={{...card,marginTop:14}}>
