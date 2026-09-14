@@ -197,7 +197,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
-  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]); const [riscatti,setRiscatti]=useState([]); const [novita,setNovita]=useState([]);
+  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]); const [riscatti,setRiscatti]=useState([]); const [novita,setNovita]=useState([]); const [impost,setImpost]=useState({});
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -210,6 +210,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     const { data:cl }=await supabase.rpc("classifica"); setClassifica(cl||[]);
     await loadRiscatti();
     const { data:nv }=await supabase.from("novita").select("*").eq("attivo",true).order("created_at",{ascending:false}); setNovita(nv||[]);
+    const { data:imp }=await supabase.from("impostazioni").select("key,value"); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setImpost(im);
   })(); },[me.id]);
   async function answer(ev,patch){
     setRsvp(r=>({...r,[ev]:{...(r[ev]||{}),...patch}}));
@@ -225,7 +226,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const closeNotif=()=>{ setNotifClosing(true); setTimeout(()=>{ setNotifOpen(false); setNotifClosing(false); },210); };
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
-    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica} novita={novita}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica} novita={novita} impost={impost}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : tab==="premi" ? <SPremi me={me} myPunti={myPunti} riscatti={riscatti} reloadRiscatti={loadRiscatti}/>
@@ -279,7 +280,7 @@ function NotifRow({ color, title, sub, onClick }){
   </button>;
 }
 
-function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica, novita }){
+function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica, novita, impost }){
   const [openAvviso,setOpenAvviso]=useState(null);
   const upcoming=events.slice(0,6);
   const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
@@ -319,13 +320,12 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         <Shield size={17}/> Pannello Admin</button>}
 
       <h3 style={sect}>Aftermovie Estate 2026</h3>
-      <div style={{position:"relative",width:"100%",height:190,borderRadius:18,overflow:"hidden",marginBottom:24,background:"linear-gradient(130deg,#7170F1,#255FF0 55%,#18C7D0)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <button onClick={()=>{ const u=(impost||{}).aftermovie_url; if(u) window.open(u,"_blank"); }} style={{position:"relative",width:"100%",height:190,borderRadius:18,overflow:"hidden",marginBottom:24,background:"linear-gradient(130deg,#7170F1,#255FF0 55%,#18C7D0)",display:"flex",alignItems:"center",justifyContent:"center",border:"none",padding:0,cursor:(impost&&impost.aftermovie_url)?"pointer":"default"}}>
         <div style={{width:58,height:58,borderRadius:30,background:"rgba(255,255,255,0.92)",display:"flex",alignItems:"center",justifyContent:"center"}}><Play size={24} color={C.primary} style={{marginLeft:3}}/></div>
         <div style={{position:"absolute",left:14,bottom:12,right:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{...head,color:"#fff",fontWeight:700,fontSize:18}}>Rivivi l'estate</span>
-          <span style={{color:"#fff",fontSize:12.5,background:"rgba(0,0,0,0.28)",borderRadius:6,padding:"2px 7px"}}>3:24</span>
+          <span style={{...head,color:"#fff",fontWeight:700,fontSize:18}}>{(impost&&impost.aftermovie_titolo)||"Rivivi l'estate"}</span>
         </div>
-      </div>
+      </button>
 
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:11}}>
         <h3 style={{...sect,margin:0}}>Prossimi eventi</h3>
@@ -788,18 +788,32 @@ function AdminComunicazioni({ me }){
   const [counts,setCounts]=useState({});
   const [nov,setNov]=useState(null);
   const [editingN,setEditingN]=useState(null);
+  const [af,setAf]=useState({aftermovie_url:"",aftermovie_titolo:""}); const [afMsg,setAfMsg]=useState("");
   async function load(){
     const { data }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
     setRows(data||[]);
     const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at");
     const c={}; (le||[]).forEach(x=>{ if(x.confermata_at) c[x.comunicazione_id]=(c[x.comunicazione_id]||0)+1; }); setCounts(c);
     const { data:nv }=await supabase.from("novita").select("*").order("created_at",{ascending:false}); setNov(nv||[]);
+    const { data:imp }=await supabase.from("impostazioni").select("key,value"); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setAf({aftermovie_url:im.aftermovie_url||"",aftermovie_titolo:im.aftermovie_titolo||""});
   }
   useEffect(()=>{ load(); },[]);
   async function del(id){ if(!window.confirm("Eliminare questa comunicazione?")) return; await supabase.from("comunicazioni").delete().eq("id",id); load(); }
   async function delN(id){ if(!window.confirm("Eliminare questa novità?")) return; await supabase.from("novita").delete().eq("id",id); load(); }
+  async function saveAf(){ await supabase.from("impostazioni").upsert([{key:"aftermovie_url",value:af.aftermovie_url.trim()||null},{key:"aftermovie_titolo",value:af.aftermovie_titolo.trim()||null}],{onConflict:"key"}); setAfMsg("Salvato"); setTimeout(()=>setAfMsg(""),2000); }
   return (
     <div>
+      <div style={{...card,marginBottom:20}}>
+        <h3 style={{...sect,marginTop:0}}>Aftermovie in Home</h3>
+        <label style={lbl}>Link del video (YouTube, Drive, ecc.)</label>
+        <input value={af.aftermovie_url} onChange={e=>setAf(a=>({...a,aftermovie_url:e.target.value}))} placeholder="https://..." style={inp}/>
+        <label style={lbl}>Titolo mostrato</label>
+        <input value={af.aftermovie_titolo} onChange={e=>setAf(a=>({...a,aftermovie_titolo:e.target.value}))} placeholder="Rivivi l'estate" style={inp}/>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}>
+          <button onClick={saveAf} style={{...btnPrimary,padding:"9px 16px"}}>Salva aftermovie</button>
+          {afMsg && <span style={{color:C.success,fontSize:13,fontWeight:700}}>{afMsg}</span>}
+        </div>
+      </div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
         <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Comunicazioni</h2>
         <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuova</button>
