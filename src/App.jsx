@@ -185,21 +185,22 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
-    const { data:parts }=await supabase.from("eventi_partecipazioni").select("evento_id,rsvp").eq("staff_id",me.id);
-    const m={}; (parts||[]).forEach(p=>m[p.evento_id]=p.rsvp); setRsvp(m);
+    const { data:parts }=await supabase.from("eventi_partecipazioni").select("evento_id,rsvp,citta_partenza,ha_macchina").eq("staff_id",me.id);
+    const m={}; (parts||[]).forEach(p=>m[p.evento_id]={rsvp:p.rsvp,citta_partenza:p.citta_partenza,ha_macchina:p.ha_macchina}); setRsvp(m);
     const { data:c }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
     setComs(c||[]);
     const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at").eq("staff_id",me.id);
     const lm={}; (le||[]).forEach(x=>{ if(x.confermata_at) lm[x.comunicazione_id]=true; }); setLetto(lm);
   })(); },[me.id]);
-  async function answer(ev,val){
-    setRsvp(r=>({...r,[ev]:val}));
-    await supabase.from("eventi_partecipazioni").upsert({evento_id:ev,staff_id:me.id,rsvp:val,rsvp_at:new Date().toISOString()},{onConflict:"evento_id,staff_id"});
+  async function answer(ev,patch){
+    setRsvp(r=>({...r,[ev]:{...(r[ev]||{}),...patch}}));
+    const extra=patch.rsvp?{rsvp_at:new Date().toISOString()}:{};
+    await supabase.from("eventi_partecipazioni").upsert({evento_id:ev,staff_id:me.id,...patch,...extra},{onConflict:"evento_id,staff_id"});
   }
   async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
   const ev=events.find(e=>e.id===openEvent);
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["profilo",User,"Profilo"]];
-  const content = ev ? <EventDetail ev={ev} answer={rsvp[ev.id]} onA={answer} onBack={()=>setOpenEvent(null)}/>
+  const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)}/>
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
@@ -355,8 +356,12 @@ function SProfilo({ me, onLogout, reload }){
   );
 }
 
-function EventDetail({ ev, answer, onA, onBack }){
+function EventDetail({ ev, part, onA, onBack }){
   const cat=CAT[ev.categoria]||CAT.NOTTE_EVENTO;
+  const rs=part.rsvp;
+  const [citta,setCitta]=useState(part.citta_partenza||"");
+  const [auto,setAuto]=useState(part.ha_macchina);
+  const tb=(active)=>({flex:1,cursor:"pointer",borderRadius:11,padding:"11px 0",fontFamily:"Barlow",fontWeight:700,fontSize:14,border:active?"none":`1px solid ${C.border}`,background:active?C.primary:C.surface,color:active?"#fff":C.text});
   return (
     <div style={{paddingBottom:28}}>
       <div style={{padding:"10px 14px 0"}}>
@@ -372,15 +377,26 @@ function EventDetail({ ev, answer, onA, onBack }){
       <div style={{margin:"20px 16px 0"}}>
         <p style={{...head,fontSize:15,fontWeight:700,margin:"0 0 10px"}}>Ci sarai?</p>
         <div style={{display:"flex",gap:10}}>
-          <button onClick={()=>onA(ev.id,"ci_saro")} style={{...bigBtn,background:answer==="ci_saro"?C.success:C.surface,color:answer==="ci_saro"?"#fff":C.text,border:answer==="ci_saro"?"none":`1px solid ${C.border}`}}><Check size={18}/> Ci sarò</button>
-          <button onClick={()=>onA(ev.id,"non_ci_saro")} style={{...bigBtn,background:answer==="non_ci_saro"?"#eef1f6":C.surface,color:C.text,border:`1px solid ${C.border}`}}><X size={18}/> Non ci sarò</button>
+          <button onClick={()=>onA(ev.id,{rsvp:"ci_saro"})} style={{...bigBtn,background:rs==="ci_saro"?C.success:C.surface,color:rs==="ci_saro"?"#fff":C.text,border:rs==="ci_saro"?"none":`1px solid ${C.border}`}}><Check size={18}/> Ci sarò</button>
+          <button onClick={()=>onA(ev.id,{rsvp:"non_ci_saro"})} style={{...bigBtn,background:rs==="non_ci_saro"?"#eef1f6":C.surface,color:C.text,border:`1px solid ${C.border}`}}><X size={18}/> Non ci sarò</button>
         </div>
+        {rs==="ci_saro" && (
+          <div style={{...card,marginTop:14}}>
+            <label style={lbl}>Da dove parti?</label>
+            <input value={citta} onChange={e=>setCitta(e.target.value)} onBlur={()=>onA(ev.id,{citta_partenza:citta.trim()||null})} placeholder="Città di partenza" style={inp}/>
+            <label style={{...lbl,marginTop:12}}>Hai la macchina?</label>
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button onClick={()=>{setAuto(true);onA(ev.id,{ha_macchina:true});}} style={tb(auto===true)}>Sì</button>
+              <button onClick={()=>{setAuto(false);onA(ev.id,{ha_macchina:false});}} style={{...tb(auto===false),background:auto===false?"#eef1f6":C.surface,color:C.text,border:auto===false?"none":`1px solid ${C.border}`}}>No</button>
+            </div>
+          </div>
+        )}
+        {rs && <p style={{fontSize:12.5,color:C.mut,margin:"12px 2px 0"}}>{rs==="ci_saro"?"Risposta salvata. L'ufficio confermerà la presenza alla serata.":"Ok, l'ufficio è stato avvisato."}</p>}
       </div>
     </div>
   );
 }
 
-/* =============================== ADMIN =============================== */
 function Admin({ me, onLogout, onBack }){
   const desktop=useMedia("(min-width:860px)");
   const [section,setSection]=useState("staff");
@@ -559,8 +575,8 @@ function EventoPresenze({ ev, onBack }){
   async function load(){
     const { data:st }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,attivo").eq("attivo",true).order("cognome");
     setStaff(st||[]);
-    const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id,rsvp,presente").eq("evento_id",ev.id);
-    const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente}); setPart(m);
+    const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id,rsvp,presente,citta_partenza,ha_macchina").eq("evento_id",ev.id);
+    const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente,citta_partenza:p.citta_partenza,ha_macchina:p.ha_macchina}); setPart(m);
   }
   useEffect(()=>{ load(); },[ev.id]);
   async function togglePresente(sid){
@@ -570,6 +586,7 @@ function EventoPresenze({ ev, onBack }){
   }
   const cat=CAT[ev.categoria]||CAT.NOTTE_EVENTO;
   const all=staff||[];
+  const macchinaTxt=v=>v===true?"Sì":v===false?"No":"—";
   const list=all.filter(s=>{
     const p=part[s.id]||{};
     if(q && !(`${s.nome} ${s.cognome}`).toLowerCase().includes(q.toLowerCase())) return false;
@@ -577,22 +594,34 @@ function EventoPresenze({ ev, onBack }){
     if(filter==="no") return p.rsvp==="non_ci_saro";
     if(filter==="presenti") return p.presente===true;
     if(filter==="assenti") return p.presente!==true;
+    if(filter==="auto") return p.ha_macchina===true;
     return true;
   });
   const nSi=all.filter(s=>(part[s.id]||{}).rsvp==="ci_saro").length;
   const nPres=all.filter(s=>(part[s.id]||{}).presente===true).length;
-  const chips=[["tutti","Tutti"],["si","Ci sarò"],["no","Non ci sarò"],["presenti","Presenti"],["assenti","Assenti"]];
+  const nAuto=all.filter(s=>(part[s.id]||{}).ha_macchina===true).length;
+  const chips=[["tutti","Tutti"],["si","Ci sarò"],["no","Non ci sarò"],["presenti","Presenti"],["assenti","Assenti"],["auto","Con macchina"]];
+  function esporta(){
+    const lines=[["Nome","Cognome","Ruolo","Disponibilità","Città partenza","Macchina","Presente"]];
+    all.forEach(s=>{ const p=part[s.id]||{}; lines.push([s.nome,s.cognome,rlabel(s.ruolo), p.rsvp==="ci_saro"?"Ci sarò":p.rsvp==="non_ci_saro"?"Non ci sarò":"—", p.citta_partenza||"", macchinaTxt(p.ha_macchina), p.presente===true?"Sì":"No"]); });
+    const csv=lines.map(r=>r.map(x=>`"${(x==null?"":String(x)).replace(/"/g,String.fromCharCode(34)+String.fromCharCode(34))}"`).join(",")).join(String.fromCharCode(10));
+    downloadCSV("resoconto-"+(ev.titolo||"evento")+".csv",csv);
+  }
   return (
     <div>
       <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"transparent",border:"none",cursor:"pointer",color:C.mut,fontSize:14,padding:"2px 0 10px",fontFamily:"Barlow"}}><ChevronLeft size={18}/> Eventi</button>
-      <div style={{...card,borderLeft:`4px solid ${cat.color}`,marginBottom:14}}>
-        <span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
-        <div style={{...head,fontSize:20,fontWeight:800,margin:"2px 0 3px"}}>{ev.titolo}</div>
-        <div style={{fontSize:12.5,color:C.mut}}>{fdate(ev.inizio)}{ev.luogo?` · ${ev.luogo}`:""}</div>
+      <div style={{...card,borderLeft:`4px solid ${cat.color}`,marginBottom:14,display:"flex",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+        <div style={{flex:1,minWidth:180}}>
+          <span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
+          <div style={{...head,fontSize:20,fontWeight:800,margin:"2px 0 3px"}}>{ev.titolo}</div>
+          <div style={{fontSize:12.5,color:C.mut}}>{fdate(ev.inizio)}{ev.luogo?` · ${ev.luogo}`:""}</div>
+        </div>
+        <button onClick={esporta} style={{...btnGhost,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",fontSize:13}}><Download size={15}/> Resoconto</button>
       </div>
       <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         <BigStat n={nSi} l="Hanno detto sì" Ic={Check} col={C.success}/>
         <BigStat n={nPres} l="Presenti segnati" Ic={Users} col={C.primary}/>
+        <BigStat n={nAuto} l="Con macchina" Ic={Check} col={C.accent}/>
       </div>
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
         {chips.map(([k,l])=>{ const on=filter===k; return <button key={k} onClick={()=>setFilter(k)} style={{border:`1px solid ${on?C.primary:C.border}`,background:on?C.primarySoft:C.surface,color:on?C.primary:C.mut,borderRadius:999,padding:"6px 12px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:"Barlow"}}>{l}</button>; })}
@@ -604,9 +633,10 @@ function EventoPresenze({ ev, onBack }){
        : <div style={{display:"flex",flexDirection:"column",gap:9}}>
           {list.map(s=>{ const p=part[s.id]||{}; const pres=p.presente===true; return (
             <div key={s.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:150}}>
+              <div style={{flex:1,minWidth:160}}>
                 <div style={{fontWeight:600,fontSize:14}}>{s.nome} {s.cognome}</div>
                 <div style={{fontSize:12,color:C.mut}}>{rlabel(s.ruolo)}</div>
+                {p.rsvp==="ci_saro" && <div style={{fontSize:12,color:C.mut,marginTop:3}}>Parte da: {p.citta_partenza||"—"} · Macchina: {macchinaTxt(p.ha_macchina)}</div>}
               </div>
               {p.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:p.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="Non ci sarò"/>:<Tag c={C.mut} bg="#f2f5fb" t="Nessuna risposta"/>}
               <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
@@ -902,8 +932,8 @@ function ERow({ e, state, onClick }){ const cat=CAT[e.categoria]||CAT.NOTTE_EVEN
       <span style={{flex:1}}><span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
         <span style={{display:"block",fontSize:15,fontWeight:700,color:C.text,marginTop:2}}>{e.titolo}</span>
         <span style={{display:"block",fontSize:12.5,color:C.mut,marginTop:3}}>{fdate(e.inizio)}{e.luogo?` · ${e.luogo}`:""}</span></span>
-      {state==="ci_saro"?<span style={{display:"flex",alignItems:"center",gap:4,color:C.success,fontSize:12,fontWeight:700}}><Check size={15}/> Ci sarò</span>
-       :state==="non_ci_saro"?<span style={{color:C.mut,fontSize:12,fontWeight:600}}>Assente</span>
+      {state&&state.rsvp==="ci_saro"?<span style={{display:"flex",alignItems:"center",gap:4,color:C.success,fontSize:12,fontWeight:700}}><Check size={15}/> Ci sarò</span>
+       :state&&state.rsvp==="non_ci_saro"?<span style={{color:C.mut,fontSize:12,fontWeight:600}}>Assente</span>
        :<ChevronRight size={18} color={C.mut}/>}
     </span></button>); }
 function Line({ icon, t }){ return <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:9,fontSize:14}}>{icon}{t}</div>; }
