@@ -38,6 +38,7 @@ export default function App(){
 
   if(!ready) return <Splash/>;
   if(!me) return <Login onDone={async(sess)=>{ await supabase.auth.setSession(sess); await loadMe(); }}/>;
+  if(me.ruolo!=="UFFICIO" && !me.profilo_completato) return <Onboarding me={me} onDone={loadMe} onLogout={async()=>{ await supabase.auth.signOut(); setMe(null); }}/>;
   return <Shell me={me} onLogout={async()=>{ await supabase.auth.signOut(); setMe(null); }}/>;
 }
 
@@ -91,6 +92,81 @@ const inp={width:"100%",border:`1px solid ${C.border}`,borderRadius:11,padding:"
 const quickBtn={flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:"9px 0",background:"#f2f5fb",color:C.text,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Barlow"};
 
 /* =============================== SHELL =============================== */
+function OField({label,value,onChange,type,req,valid,placeholder,hint,options}){
+  return (
+    <div style={{marginBottom:12}}>
+      <label style={lbl}>{label}{req?<span style={{color:"#d33"}}> *</span>:null}</label>
+      {options
+        ? <select value={value} onChange={e=>onChange(e.target.value)} style={inp}><option value="">Seleziona\u2026</option>{options.map(o=><option key={o} value={o}>{o}</option>)}</select>
+        : <input type={type||"text"} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder||""} style={{...inp,borderColor:(req&&value&&!valid)?"#e0a0a0":C.border}}/>}
+      {req&&value&&!valid&&hint?<p style={{color:"#d33",fontSize:11.5,margin:"4px 2px 0"}}>{hint}</p>:null}
+    </div>
+  );
+}
+
+function Onboarding({ me, onDone, onLogout }){
+  const [f,setF]=useState({nascita:me.nascita||"",sesso:me.sesso||"",citta:me.citta||"",indirizzo:me.indirizzo||"",codice_fiscale:me.codice_fiscale||"",email:me.email||"",telefono:me.telefono||"",instagram:me.instagram||"",professione:me.professione||"",aspirazioni:me.aspirazioni||""});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const cf=(f.codice_fiscale||"").trim().toUpperCase();
+  const emailOk=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((f.email||"").trim());
+  const telOk=(f.telefono||"").replace(/[^0-9]/g,"").length>=6;
+  const cfOk=cf.length===16;
+  const req={nascita:!!f.nascita,sesso:!!f.sesso,citta:!!f.citta.trim(),indirizzo:!!f.indirizzo.trim(),codice_fiscale:cfOk,email:emailOk,telefono:telOk};
+  const mancanti=Object.values(req).filter(v=>!v).length;
+  const ok=mancanti===0;
+  async function completa(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const { error }=await supabase.from("staff_anagrafica").update({nascita:f.nascita||null,sesso:f.sesso||null,citta:f.citta.trim()||null,indirizzo:f.indirizzo.trim()||null,codice_fiscale:cf||null,email:f.email.trim()||null,telefono:f.telefono.trim()||null,instagram:f.instagram.trim()||null,professione:f.professione.trim()||null,aspirazioni:f.aspirazioni.trim()||null,profilo_completato:true}).eq("id",me.id);
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onDone();
+  }
+  return (
+    <div style={{minHeight:"100%",background:C.bg,display:"flex",flexDirection:"column"}}>
+      <div style={{background:C.primary,flexShrink:0}}>
+        <div style={{maxWidth:640,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <img src={LOGO_W} alt="INVIBE" style={{height:22}}/>
+          <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
+        </div>
+      </div>
+      <div style={{flex:1,overflowY:"auto"}}>
+        <div style={{maxWidth:640,margin:"0 auto",width:"100%",padding:"18px 16px 40px"}}>
+          <h1 style={{...head,fontSize:28,fontWeight:800,margin:"6px 0 6px"}}>Benvenuto, {me.nome}!</h1>
+          <p style={{color:C.mut,fontSize:14,lineHeight:1.5,margin:"0 0 16px"}}>Prima di entrare, controlla che i dati siano giusti e completa quelli mancanti. Ti serve una volta sola.</p>
+          <div style={{background:ok?C.successSoft:C.amberSoft,border:`1px solid ${ok?"rgba(34,179,107,0.3)":"#f4d9a6"}`,borderRadius:12,padding:"10px 13px",marginBottom:18,fontSize:13.5,fontWeight:700,color:ok?"#177a4a":"#8a5a12"}}>
+            {ok?"Tutto pronto \u2014 puoi entrare.":`Mancano ${mancanti} ${mancanti===1?"dato":"dati"} da sistemare.`}
+          </div>
+          <div style={card}>
+            <h3 style={{...sect,marginTop:0}}>I tuoi dati</h3>
+            <OField label="Data di nascita" type="date" value={f.nascita} onChange={v=>set("nascita",v)} req valid={!!f.nascita}/>
+            <OField label="Sesso" value={f.sesso} onChange={v=>set("sesso",v)} req valid={!!f.sesso} options={["Uomo","Donna"]}/>
+            <OField label="Citt\u00e0" value={f.citta} onChange={v=>set("citta",v)} req valid={!!f.citta.trim()} placeholder="Es. Torino"/>
+            <OField label="Indirizzo di casa" value={f.indirizzo} onChange={v=>set("indirizzo",v)} req valid={!!f.indirizzo.trim()} placeholder="Via, numero, citt\u00e0"/>
+            <OField label="Codice fiscale" value={f.codice_fiscale} onChange={v=>set("codice_fiscale",v.toUpperCase())} req valid={cfOk} hint="Deve avere 16 caratteri" placeholder="16 caratteri"/>
+          </div>
+          <div style={{...card,marginTop:14}}>
+            <h3 style={{...sect,marginTop:0}}>Contatti</h3>
+            <OField label="Email" type="email" value={f.email} onChange={v=>set("email",v)} req valid={emailOk} hint="Email non valida" placeholder="nome@email.it"/>
+            <OField label="Telefono" value={f.telefono} onChange={v=>set("telefono",v)} req valid={telOk} hint="Numero non valido" placeholder="+39 ..."/>
+            <OField label="Instagram" value={f.instagram} onChange={v=>set("instagram",v)} placeholder="@tuonome" valid={true}/>
+          </div>
+          <div style={{...card,marginTop:14}}>
+            <h3 style={{...sect,marginTop:0}}>Su di te</h3>
+            <OField label="Cosa fai nella vita / studi" value={f.professione} onChange={v=>set("professione",v)} placeholder="Es. Studente di economia" valid={true}/>
+            <OField label="Aspirazioni" value={f.aspirazioni} onChange={v=>set("aspirazioni",v)} placeholder="Cosa ti piacerebbe fare in Invibe" valid={true}/>
+          </div>
+          {err?<p style={{color:"#d33",fontSize:13,margin:"12px 2px 0"}}>{err}</p>:null}
+          <button onClick={completa} disabled={!ok||busy} style={{...btnPrimary,width:"100%",marginTop:18,padding:"14px 0",fontSize:15,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            {busy&&<Loader2 size={17} className="spin"/>} Completa e entra
+          </button>
+          <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Shell({ me, onLogout }){
   const [admin,setAdmin]=useState(false);
   const isUff=me.ruolo==="UFFICIO";
