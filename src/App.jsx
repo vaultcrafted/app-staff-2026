@@ -181,7 +181,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
-  const [coms,setComs]=useState([]);
+  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({});
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -189,17 +189,20 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
     const m={}; (parts||[]).forEach(p=>m[p.evento_id]=p.rsvp); setRsvp(m);
     const { data:c }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
     setComs(c||[]);
+    const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at").eq("staff_id",me.id);
+    const lm={}; (le||[]).forEach(x=>{ if(x.confermata_at) lm[x.comunicazione_id]=true; }); setLetto(lm);
   })(); },[me.id]);
   async function answer(ev,val){
     setRsvp(r=>({...r,[ev]:val}));
     await supabase.from("eventi_partecipazioni").upsert({evento_id:ev,staff_id:me.id,rsvp:val,rsvp_at:new Date().toISOString()},{onConflict:"evento_id,staff_id"});
   }
+  async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
   const ev=events.find(e=>e.id===openEvent);
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} answer={rsvp[ev.id]} onA={answer} onBack={()=>setOpenEvent(null)}/>
-    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
-    : tab==="avvisi" ? <SAvvisi coms={coms}/>
+    : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : <SProfilo me={me} onLogout={onLogout}/>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
@@ -227,8 +230,9 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
   );
 }
 
-function SHome({ me, events, rsvp, onA, open, isUff, openAdmin }){
+function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma }){
   const upcoming=events.slice(0,6);
+  const bannerCom=(coms||[]).find(c=>c.richiede_conferma && !letto[c.id]);
   return (
     <div style={{padding:"16px 16px 28px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
@@ -242,6 +246,18 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin }){
         </div>
       </div>
 
+      {bannerCom && (
+        <div style={{background:C.amberSoft,border:"1px solid #f4d9a6",borderRadius:16,padding:14,marginBottom:18}}>
+          <div style={{display:"flex",gap:9}}>
+            <Bell size={17} color={C.amber} style={{flexShrink:0,marginTop:1}}/>
+            <div style={{flex:1}}>
+              <p style={{margin:0,fontWeight:700,fontSize:14}}>{bannerCom.titolo}</p>
+              {bannerCom.corpo && <p style={{margin:"2px 0 0",fontSize:12.5,color:C.mut}}>{bannerCom.corpo}</p>}
+            </div>
+          </div>
+          <button onClick={()=>conferma(bannerCom.id)} style={{...btnPrimary,width:"100%",marginTop:11,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>
+        </div>
+      )}
       {isUff && <button onClick={openAdmin} style={{...btnPrimary,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"12px 0"}}>
         <Shield size={17}/> Pannello Admin</button>}
 
@@ -294,21 +310,25 @@ function SEventi({ events, rsvp, open }){
   );
 }
 
-function SAvvisi({ coms }){
+function SAvvisi({ coms, letto, conferma }){
   return (
     <div style={{padding:"16px 16px 24px"}}>
       <h1 style={{...head,fontSize:26,fontWeight:800,margin:"4px 0 3px"}}>Avvisi</h1>
       <p style={{margin:"0 0 18px",color:C.mut,fontSize:13}}>Comunicazioni dall'ufficio.</p>
       {coms.length===0 ? <div style={{...card,color:C.mut,fontSize:13}}>Nessun avviso.</div>
       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          {coms.map(c=><div key={c.id} style={card}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <span style={{fontWeight:700,fontSize:14.5}}>{c.titolo}</span>
-              {c.richiede_conferma && <span style={{fontSize:10.5,fontWeight:700,color:C.amber,background:C.amberSoft,borderRadius:6,padding:"3px 7px"}}>DA FARE</span>}
-            </div>
-            {c.corpo && <p style={{margin:"0 0 7px",fontSize:13,color:C.mut,lineHeight:1.45}}>{c.corpo}</p>}
-            <span style={{fontSize:11.5,color:C.mut}}>{fdate(c.created_at)}</span>
-          </div>)}
+          {coms.map(c=>{ const confermato=!!letto[c.id]; return (
+            <div key={c.id} style={card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5,gap:8}}>
+                <span style={{fontWeight:700,fontSize:14.5}}>{c.titolo}</span>
+                {c.richiede_conferma && (confermato
+                  ? <span style={{fontSize:10.5,fontWeight:700,color:C.success,background:C.successSoft,borderRadius:6,padding:"3px 7px",whiteSpace:"nowrap"}}>CONFERMATO</span>
+                  : <span style={{fontSize:10.5,fontWeight:700,color:C.amber,background:C.amberSoft,borderRadius:6,padding:"3px 7px",whiteSpace:"nowrap"}}>DA CONFERMARE</span>)}
+              </div>
+              {c.corpo && <p style={{margin:"0 0 7px",fontSize:13,color:C.mut,lineHeight:1.45}}>{c.corpo}</p>}
+              <span style={{fontSize:11.5,color:C.mut}}>{fdate(c.created_at)}</span>
+              {c.richiede_conferma && !confermato && <button onClick={()=>conferma(c.id)} style={{...btnPrimary,marginTop:10,padding:"9px 16px"}}>Conferma</button>}
+            </div>); })}
         </div>}
     </div>
   );
@@ -364,7 +384,8 @@ function Admin({ me, onLogout, onBack }){
   const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"]];
   const body = section==="staff" ? <AdminStaff/>
     : section==="eventi" ? <AdminEventi me={me}/>
-    : <div style={{...card,color:C.mut,fontSize:14}}>{section==="presenze"?"Presenze":"Comunicazioni"} — in arrivo nel prossimo blocco.</div>;
+    : section==="avvisi" ? <AdminComunicazioni me={me}/>
+    : <div style={{...card,color:C.mut,fontSize:14}}>Presenze — si gestiscono dentro ogni evento (Eventi › Gestisci presenze).</div>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       {desktop &&
@@ -524,6 +545,89 @@ function EventoPresenze({ ev, onBack }){
               <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
             </div>); })}
          </div>}
+    </div>
+  );
+}
+
+function AdminComunicazioni({ me }){
+  const [rows,setRows]=useState(null);
+  const [editing,setEditing]=useState(null);
+  const [counts,setCounts]=useState({});
+  async function load(){
+    const { data }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
+    setRows(data||[]);
+    const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at");
+    const c={}; (le||[]).forEach(x=>{ if(x.confermata_at) c[x.comunicazione_id]=(c[x.comunicazione_id]||0)+1; }); setCounts(c);
+  }
+  useEffect(()=>{ load(); },[]);
+  async function del(id){ if(!window.confirm("Eliminare questa comunicazione?")) return; await supabase.from("comunicazioni").delete().eq("id",id); load(); }
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Comunicazioni</h2>
+        <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuova</button>
+      </div>
+      {rows===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : rows.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessuna comunicazione. Creane una — arriverà a tutto lo staff.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {rows.map(c=>(
+            <div key={c.id} style={{...card,display:"flex",alignItems:"flex-start",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                  <span style={{...head,fontSize:17,fontWeight:700}}>{c.titolo}</span>
+                  {c.richiede_conferma && <span style={{fontSize:10,fontWeight:700,color:C.amber,background:C.amberSoft,borderRadius:6,padding:"2px 7px"}}>CONFERMA</span>}
+                </div>
+                {c.corpo && <p style={{margin:"0 0 5px",fontSize:13,color:C.mut,lineHeight:1.45}}>{c.corpo}</p>}
+                <span style={{fontSize:11.5,color:C.mut}}>{fdate(c.created_at)}{c.richiede_conferma?` · confermata da ${counts[c.id]||0}`:""}</span>
+              </div>
+              <button onClick={()=>setEditing(c)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={17}/></button>
+              <button onClick={()=>del(c.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
+            </div>))}
+         </div>}
+      {editing!==null && <ComForm me={me} com={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+    </div>
+  );
+}
+
+function ComForm({ me, com, onClose, onSaved }){
+  const isEdit=!!com.id;
+  const [f,setF]=useState({titolo:com.titolo||"",corpo:com.corpo||"",richiede_conferma:!!com.richiede_conferma});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const ok=f.titolo.trim();
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const payload={titolo:f.titolo.trim(),corpo:f.corpo.trim()||null,richiede_conferma:f.richiede_conferma};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("comunicazioni").update(payload).eq("id",com.id)); }
+    else { ({ error }=await supabase.from("comunicazioni").insert({...payload,created_by:me.id})); }
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onSaved();
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica comunicazione":"Nuova comunicazione"}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <label style={lbl}>Titolo *</label>
+        <input value={f.titolo} onChange={e=>set("titolo",e.target.value)} placeholder="Es. Consegna materiali entro venerdì" style={inp}/>
+        <label style={lbl}>Testo</label>
+        <textarea value={f.corpo} onChange={e=>set("corpo",e.target.value)} rows={4} style={{...inp,resize:"vertical"}}/>
+        <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
+          <input type="checkbox" checked={f.richiede_conferma} onChange={e=>set("richiede_conferma",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
+          <span style={{fontSize:13.5,color:C.text}}>Richiede conferma — resta come banner finché lo staff non conferma</span>
+        </label>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+        <p style={{fontSize:12,color:C.mut,margin:"10px 2px 0"}}>Arriva a tutto lo staff Invibe.</p>
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Invia"}</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
     </div>
   );
 }
