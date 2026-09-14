@@ -181,7 +181,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
-  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({});
+  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]);
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -191,6 +191,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     setComs(c||[]);
     const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at").eq("staff_id",me.id);
     const lm={}; (le||[]).forEach(x=>{ if(x.confermata_at) lm[x.comunicazione_id]=true; }); setLetto(lm);
+    const { data:cl }=await supabase.rpc("classifica"); setClassifica(cl||[]);
   })(); },[me.id]);
   async function answer(ev,patch){
     setRsvp(r=>({...r,[ev]:{...(r[ev]||{}),...patch}}));
@@ -201,7 +202,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const ev=events.find(e=>e.id===openEvent);
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)}/>
-    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : <SProfilo me={me} onLogout={onLogout} reload={reload}/>;
@@ -231,9 +232,14 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   );
 }
 
-function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma }){
+function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica }){
   const upcoming=events.slice(0,6);
   const bannerCom=(coms||[]).find(c=>c.richiede_conferma && !letto[c.id]);
+  const cl=classifica||[];
+  const myIdx=cl.findIndex(x=>x.staff_id===me.id);
+  const myPunti=myIdx>=0?cl[myIdx].punti:0;
+  const myRank=myIdx>=0?myIdx+1:0;
+  const top=cl.slice(0,5);
   return (
     <div style={{padding:"16px 16px 28px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
@@ -243,7 +249,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
           <p style={{margin:0,color:C.mut,fontSize:12.5}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p>
         </div>
         <div style={{display:"flex",alignItems:"center",gap:6,background:C.accentSoft,borderRadius:999,padding:"6px 11px"}}>
-          <Trophy size={14} color={C.accent}/><span style={{...head,fontWeight:700,fontSize:14,color:C.accent}}>0</span>
+          <Trophy size={14} color={C.accent}/><span style={{...head,fontWeight:700,fontSize:14,color:C.accent}}>{myPunti}</span>
         </div>
       </div>
 
@@ -293,6 +299,17 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
       <div style={{display:"flex",flexDirection:"column",gap:11}}>
         <News tag="Reunion" color={C.accent} title="Aperte le iscrizioni al Reunion" body="Segna la data: la grande rimpatriata dello staff." time="di recente"/>
         <News tag="Merch" color={C.primary} title="Nuovo merch INVIBE in sede" body="Poli e felpe nuove disponibili. Passa a ritirarle." time="di recente"/>
+      </div>
+      <h3 style={{...sect,marginTop:24}}>Classifica</h3>
+      <div style={card}>
+        {top.length===0 ? <span style={{color:C.mut,fontSize:13}}>Ancora nessun punto assegnato. Partecipa agli eventi!</span>
+         : top.map((r,i)=>{ const meRow=r.staff_id===me.id; return (
+           <div key={r.staff_id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none"}}>
+             <span style={{...head,fontSize:16,fontWeight:800,color:i<3?C.accent:C.mut,width:24}}>{i+1}</span>
+             <span style={{flex:1,fontWeight:meRow?700:600,fontSize:14,color:meRow?C.primary:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}{meRow?" (tu)":""}</span>
+             <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
+           </div>); })}
+        {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {myPunti} punti</div>}
       </div>
     </div>
   );
@@ -867,13 +884,13 @@ function StaffDetail({ id, onBack }){
 
 function EventForm({ me, ev, onClose, onSaved }){
   const isEdit=!!ev.id;
-  const [f,setF]=useState({titolo:ev.titolo||"",categoria:ev.categoria||"NOTTE_EVENTO",inizio:ev.inizio?toLocalInput(ev.inizio):"",luogo:ev.luogo||"",zona:ev.zona||"",descrizione:ev.descrizione||""});
+  const [f,setF]=useState({titolo:ev.titolo||"",categoria:ev.categoria||"NOTTE_EVENTO",inizio:ev.inizio?toLocalInput(ev.inizio):"",luogo:ev.luogo||"",zona:ev.zona||"",descrizione:ev.descrizione||"",punti:(ev.punti!=null?ev.punti:10)});
   const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const ok=f.titolo.trim()&&f.categoria;
   async function save(){
     if(!ok||busy) return; setBusy(true); setErr("");
-    const payload={titolo:f.titolo.trim(),categoria:f.categoria,inizio:f.inizio?new Date(f.inizio).toISOString():null,luogo:f.luogo.trim()||null,zona:f.zona.trim()||null,descrizione:f.descrizione.trim()||null};
+    const payload={titolo:f.titolo.trim(),categoria:f.categoria,inizio:f.inizio?new Date(f.inizio).toISOString():null,luogo:f.luogo.trim()||null,zona:f.zona.trim()||null,descrizione:f.descrizione.trim()||null,punti:(f.punti===""||f.punti==null)?10:(parseInt(f.punti)||10)};
     let error;
     if(isEdit){ ({ error }=await supabase.from("eventi").update(payload).eq("id",ev.id)); }
     else { ({ error }=await supabase.from("eventi").insert({...payload,created_by:me.id})); }
@@ -902,6 +919,8 @@ function EventForm({ me, ev, onClose, onSaved }){
         <input value={f.luogo} onChange={e=>set("luogo",e.target.value)} placeholder="Es. Villa delle Rose, Torino" style={inp}/>
         <label style={lbl}>Zona (informativa)</label>
         <input value={f.zona} onChange={e=>set("zona",e.target.value)} placeholder="Es. Piemonte" style={inp}/>
+        <label style={lbl}>Punti presenza</label>
+        <input type="number" value={f.punti} onChange={e=>set("punti",e.target.value)} style={inp}/>
         <label style={lbl}>Descrizione</label>
         <textarea value={f.descrizione} onChange={e=>set("descrizione",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
         {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
