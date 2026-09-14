@@ -125,7 +125,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
     : tab==="avvisi" ? <SAvvisi coms={coms}/>
     : <SProfilo me={me} onLogout={onLogout}/>;
   return (
-    <div style={{minHeight:"100%",background:C.bg,display:"flex",flexDirection:"column"}}>
+    <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       <div style={{background:C.primary,flexShrink:0}}>
         <div style={{maxWidth:1080,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
           <img src={LOGO_W} alt="INVIBE" style={{height:22,display:"block"}}/>
@@ -282,22 +282,23 @@ function EventDetail({ ev, answer, onA, onBack }){
 
 /* =============================== ADMIN =============================== */
 function Admin({ me, onLogout, onBack }){
+  const desktop=useMedia("(min-width:860px)");
   const [rows,setRows]=useState(null); const [q,setQ]=useState("");
   useEffect(()=>{ supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,attivo").order("cognome").then(({data})=>setRows(data||[])); },[]);
   const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
+  const NAV=[[Users,"Staff"],[Calendar,"Eventi"],[Check,"Presenze"],[MessageSquare,"Avvisi"]];
   return (
-    <div style={{height:"100%",display:"flex",background:C.bg}}>
+    <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
+      {desktop &&
       <div style={{width:92,background:C.sidebar,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16}}>
-        <img src={LOGO_W} alt="INVIBE" style={{width:34,marginBottom:18}}/>
+        <img src={LOGO_W} alt="INVIBE" style={{width:34,marginBottom:20}}/>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
-          {[[Users,"Staff",true],[Calendar,"Eventi"],[Check,"Presenze"],[MessageSquare,"Avvisi"]].map(([Ic,l,on],i)=>(
-            <div key={i} style={{width:92,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 0",color:on?"#fff":C.sidebarMut}}><Ic size={21}/><span style={{fontSize:10.5,fontWeight:on?700:500}}>{l}</span></div>
-          ))}
+          {NAV.map(([Ic,l],i)=>(<div key={i} style={{width:92,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 0",color:i===0?"#fff":C.sidebarMut}}><Ic size={21}/><span style={{fontSize:10.5,fontWeight:i===0?700:500}}>{l}</span></div>))}
         </div>
         <button onClick={onLogout} style={{...iconBtn,color:C.sidebarMut,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 0"}}><LogOut size={20}/><span style={{fontSize:10.5}}>Esci</span></button>
-      </div>
+      </div>}
       <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
-        <div style={{background:C.primary,height:56,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 20px"}}>
+        <div style={{background:C.primary,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 18px",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:9,color:"#fff"}}>
             <button onClick={onBack} style={iconBtn}><ChevronLeft size={20} color="#fff"/></button>
             <Shield size={18} color="#fff"/><span style={{...head,fontWeight:700,fontSize:18,color:"#fff"}}>Pannello Admin</span>
@@ -331,11 +332,15 @@ function Admin({ me, onLogout, onBack }){
           </div>
         </div>
       </div>
+      {!desktop &&
+      <nav style={{flexShrink:0,background:C.sidebar,display:"flex",borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+        {NAV.map(([Ic,l],i)=>(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:i===0?"#fff":C.sidebarMut}}><Ic size={20}/><span style={{fontSize:10,fontWeight:i===0?700:500}}>{l}</span></div>))}
+        <button onClick={onLogout} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:C.sidebarMut}}><LogOut size={20}/><span style={{fontSize:10}}>Esci</span></button>
+      </nav>}
     </div>
   );
 }
 
-/* =============================== shared =============================== */
 function fdate(s){ if(!s) return "Data da definire"; try{ return new Date(s).toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"short"}); }catch{ return s; } }
 const iconBtn={background:"transparent",border:"none",cursor:"pointer",padding:0};
 const btnPrimary={border:"none",cursor:"pointer",borderRadius:11,padding:"10px 14px",background:C.primary,color:"#fff",fontWeight:700,fontSize:14,fontFamily:"Barlow"};
