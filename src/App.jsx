@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -181,7 +181,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
-  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]);
+  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]); const [riscatti,setRiscatti]=useState([]);
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -192,19 +192,23 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at").eq("staff_id",me.id);
     const lm={}; (le||[]).forEach(x=>{ if(x.confermata_at) lm[x.comunicazione_id]=true; }); setLetto(lm);
     const { data:cl }=await supabase.rpc("classifica"); setClassifica(cl||[]);
+    await loadRiscatti();
   })(); },[me.id]);
   async function answer(ev,patch){
     setRsvp(r=>({...r,[ev]:{...(r[ev]||{}),...patch}}));
     const extra=patch.rsvp?{rsvp_at:new Date().toISOString()}:{};
     await supabase.from("eventi_partecipazioni").upsert({evento_id:ev,staff_id:me.id,...patch,...extra},{onConflict:"evento_id,staff_id"});
   }
+  async function loadRiscatti(){ const { data }=await supabase.from("riscatti").select("*").eq("staff_id",me.id).order("created_at",{ascending:false}); setRiscatti(data||[]); }
   async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
   const ev=events.find(e=>e.id===openEvent);
-  const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["profilo",User,"Profilo"]];
+  const myPunti=(classifica.find(x=>x.staff_id===me.id)||{}).punti||0;
+  const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)}/>
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
+    : tab==="premi" ? <SPremi me={me} myPunti={myPunti} riscatti={riscatti} reloadRiscatti={loadRiscatti}/>
     : <SProfilo me={me} onLogout={onLogout} reload={reload}/>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
@@ -417,10 +421,11 @@ function EventDetail({ ev, part, onA, onBack }){
 function Admin({ me, onLogout, onBack }){
   const desktop=useMedia("(min-width:860px)");
   const [section,setSection]=useState("staff");
-  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"]];
+  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"]];
   const body = section==="staff" ? <AdminStaff/>
     : section==="eventi" ? <AdminEventi me={me}/>
     : section==="avvisi" ? <AdminComunicazioni me={me}/>
+    : section==="premi" ? <AdminPremi/>
     : <div style={{...card,color:C.mut,fontSize:14}}>Presenze — si gestiscono dentro ogni evento (Eventi › Gestisci presenze).</div>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
@@ -878,6 +883,146 @@ function StaffDetail({ id, onBack }){
       {msg?<p style={{fontSize:13,fontWeight:600,color:msg.startsWith("Errore")?"#d33":C.success,margin:"12px 2px 0"}}>{msg}</p>:null}
       <button onClick={save} disabled={busy} style={{...btnPrimary,width:"100%",marginTop:14,padding:"13px 0",fontSize:15,opacity:busy?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{busy&&<Loader2 size={17} className="spin"/>} Salva modifiche</button>
       <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
+
+function SPremi({ me, myPunti, riscatti, reloadRiscatti }){
+  const [premi,setPremi]=useState(null);
+  useEffect(()=>{ supabase.from("premi").select("*").eq("attivo",true).order("costo_punti").then(({data})=>setPremi(data||[])); },[]);
+  const spent=(riscatti||[]).filter(r=>r.stato!=="annullato").reduce((a,r)=>a+(r.punti_spesi||0),0);
+  const avail=(Number(myPunti)||0)-spent;
+  async function riscatta(p){
+    if(avail<p.costo_punti) return;
+    if(!window.confirm(`Riscattare "${p.nome}" per ${p.costo_punti} punti?`)) return;
+    await supabase.from("riscatti").insert({staff_id:me.id,premio_id:p.id,premio_nome:p.nome,punti_spesi:p.costo_punti,stato:"richiesto"});
+    reloadRiscatti();
+  }
+  return (
+    <div style={{padding:"16px 16px 24px"}}>
+      <h1 style={{...head,fontSize:26,fontWeight:800,margin:"4px 0 12px"}}>Premi</h1>
+      <div style={{...card,display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+        <div style={{width:44,height:44,borderRadius:12,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trophy size={20} color={C.accent}/></div>
+        <div><div style={{...head,fontSize:24,fontWeight:800,color:C.accent,lineHeight:1}}>{avail}</div><div style={{fontSize:12,color:C.mut,marginTop:2}}>punti disponibili</div></div>
+      </div>
+      {premi===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : premi.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun premio disponibile al momento.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {premi.map(p=>{ const canBuy=avail>=p.costo_punti; return (
+            <div key={p.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:150}}>
+                <div style={{...head,fontSize:17,fontWeight:700}}>{p.nome}</div>
+                {p.descrizione && <div style={{fontSize:12.5,color:C.mut,marginTop:2}}>{p.descrizione}</div>}
+                <div style={{fontSize:12.5,color:C.accent,fontWeight:700,marginTop:4}}>{p.costo_punti} punti</div>
+              </div>
+              <button onClick={()=>riscatta(p)} disabled={!canBuy} style={{...btnPrimary,padding:"9px 14px",opacity:canBuy?1:.5}}>{canBuy?"Riscatta":"Punti mancanti"}</button>
+            </div>); })}
+         </div>}
+      {(riscatti||[]).length>0 && <><h3 style={{...sect,marginTop:22}}>I miei riscatti</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:9}}>
+          {riscatti.map(r=>(
+            <div key={r.id} style={{...card,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:14}}>{r.premio_nome}</div><div style={{fontSize:12,color:C.mut}}>{r.punti_spesi} punti · {fdate(r.created_at)}</div></div>
+              <Tag c={r.stato==="consegnato"?C.success:C.amber} bg={r.stato==="consegnato"?C.successSoft:C.amberSoft} t={r.stato==="consegnato"?"Consegnato":"Richiesto"}/>
+            </div>))}
+        </div></>}
+    </div>
+  );
+}
+
+function AdminPremi(){
+  const [premi,setPremi]=useState(null); const [editing,setEditing]=useState(null);
+  const [ris,setRis]=useState([]); const [staff,setStaff]=useState({});
+  async function load(){
+    const { data:p }=await supabase.from("premi").select("*").order("costo_punti"); setPremi(p||[]);
+    const { data:r }=await supabase.from("riscatti").select("*").order("created_at",{ascending:false}); setRis(r||[]);
+    const { data:st }=await supabase.from("staff_anagrafica").select("id,nome,cognome"); const m={}; (st||[]).forEach(x=>m[x.id]=x.nome+" "+x.cognome); setStaff(m);
+  }
+  useEffect(()=>{ load(); },[]);
+  async function del(id){ if(!window.confirm("Eliminare questo premio?")) return; await supabase.from("premi").delete().eq("id",id); load(); }
+  async function consegna(id){ await supabase.from("riscatti").update({stato:"consegnato"}).eq("id",id); load(); }
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Catalogo premi</h2>
+        <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuovo premio</button>
+      </div>
+      {premi===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : premi.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun premio. Creane uno.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {premi.map(p=>(
+            <div key={p.id} style={{...card,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                  <span style={{...head,fontSize:17,fontWeight:700}}>{p.nome}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:C.accent,background:C.accentSoft,borderRadius:6,padding:"2px 7px"}}>{p.costo_punti} pt</span>
+                  {!p.attivo && <span style={{fontSize:10.5,fontWeight:700,color:C.mut,background:"#eef1f6",borderRadius:6,padding:"2px 7px"}}>NASCOSTO</span>}
+                </div>
+                {p.descrizione && <div style={{fontSize:12.5,color:C.mut,marginTop:3}}>{p.descrizione}</div>}
+              </div>
+              <button onClick={()=>setEditing(p)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={17}/></button>
+              <button onClick={()=>del(p.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
+            </div>))}
+         </div>}
+      <h3 style={{...sect,marginTop:24}}>Riscatti</h3>
+      {ris.length===0 ? <div style={{...card,color:C.mut,fontSize:13}}>Nessun riscatto ancora.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:9}}>
+          {ris.map(r=>(
+            <div key={r.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:150}}>
+                <div style={{fontWeight:600,fontSize:14}}>{staff[r.staff_id]||"—"}</div>
+                <div style={{fontSize:12,color:C.mut}}>{r.premio_nome} · {r.punti_spesi} pt · {fdate(r.created_at)}</div>
+              </div>
+              {r.stato==="consegnato"
+                ? <Tag c={C.success} bg={C.successSoft} t="Consegnato"/>
+                : <button onClick={()=>consegna(r.id)} style={{...btnPrimary,padding:"7px 12px",fontSize:12.5}}>Segna consegnato</button>}
+            </div>))}
+         </div>}
+      {editing!==null && <PremioForm premio={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+    </div>
+  );
+}
+
+function PremioForm({ premio, onClose, onSaved }){
+  const isEdit=!!premio.id;
+  const [f,setF]=useState({nome:premio.nome||"",descrizione:premio.descrizione||"",costo_punti:(premio.costo_punti!=null?premio.costo_punti:0),attivo:premio.id?!!premio.attivo:true});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const ok=f.nome.trim();
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const payload={nome:f.nome.trim(),descrizione:f.descrizione.trim()||null,costo_punti:(f.costo_punti===""||f.costo_punti==null)?0:(parseInt(f.costo_punti)||0),attivo:f.attivo};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("premi").update(payload).eq("id",premio.id)); }
+    else { ({ error }=await supabase.from("premi").insert(payload)); }
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onSaved();
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica premio":"Nuovo premio"}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <label style={lbl}>Nome *</label>
+        <input value={f.nome} onChange={e=>set("nome",e.target.value)} placeholder="Es. Ingresso omaggio" style={inp}/>
+        <label style={lbl}>Descrizione</label>
+        <textarea value={f.descrizione} onChange={e=>set("descrizione",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
+        <label style={lbl}>Costo in punti</label>
+        <input type="number" value={f.costo_punti} onChange={e=>set("costo_punti",e.target.value)} style={inp}/>
+        <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
+          <input type="checkbox" checked={f.attivo} onChange={e=>set("attivo",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
+          <span style={{fontSize:13.5,color:C.text}}>Visibile agli staff</span>
+        </label>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Crea"}</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
     </div>
   );
 }
