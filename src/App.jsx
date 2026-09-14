@@ -21,6 +21,7 @@ const LOGO_B="/logo.png";
 const head={fontFamily:"'Barlow Condensed', sans-serif"};
 const ruoli={UFFICIO:"Ufficio",CA:"Capo Animazione",CM:"Capo Meta",ACM:"Aiuto Capo Meta",FOTOGRAFO:"Fotografo",VIDEOMAKER:"Videomaker",DJ:"DJ",VOCALIST:"Vocalist",BALLERINA:"Ballerino/a",STAFF:"Staff",CONTENT_CREATOR:"Content Creator",RM:"Resp. Materiali"};
 const rlabel=r=>ruoli[r]||r||"Staff";
+const isDonna=x=>{const v=(x||"").toUpperCase();return v.startsWith("D")||v.startsWith("F");};
 function useMedia(q){ const [m,setM]=useState(()=>typeof window!=="undefined"&&window.matchMedia(q).matches); useEffect(()=>{const mq=window.matchMedia(q); const h=e=>setM(e.matches); mq.addEventListener("change",h); return ()=>mq.removeEventListener("change",h);},[q]); return m; }
 
 /* =============================== ROOT =============================== */
@@ -132,7 +133,7 @@ function Onboarding({ me, onDone, onLogout }){
       </div>
       <div style={{flex:1,overflowY:"auto"}}>
         <div style={{maxWidth:640,margin:"0 auto",width:"100%",padding:"18px 16px 40px"}}>
-          <h1 style={{...head,fontSize:28,fontWeight:800,margin:"6px 0 6px"}}>Benvenuto, {me.nome}!</h1>
+          <h1 style={{...head,fontSize:28,fontWeight:800,margin:"6px 0 6px"}}>Benvenut{isDonna(me.sesso)?"a":"o"}, {me.nome}!</h1>
           <p style={{color:C.mut,fontSize:14,lineHeight:1.5,margin:"0 0 16px"}}>Prima di entrare, controlla che i dati siano giusti e completa quelli mancanti. Ti serve una volta sola.</p>
           <div style={{background:ok?C.successSoft:C.amberSoft,border:`1px solid ${ok?"rgba(34,179,107,0.3)":"#f4d9a6"}`,borderRadius:12,padding:"10px 13px",marginBottom:18,fontSize:13.5,fontWeight:700,color:ok?"#177a4a":"#8a5a12"}}>
             {ok?"Tutto pronto — puoi entrare.":`Mancano ${mancanti} ${mancanti===1?"dato":"dati"} da sistemare.`}
