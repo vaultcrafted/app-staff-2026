@@ -50,10 +50,10 @@ function Splash(){
 function Login({ onDone }){
   const [u,setU]=useState(""); const [p,setP]=useState("");
   const [err,setErr]=useState(""); const [busy,setBusy]=useState(false);
-  async function submit(){
+  async function submit(uu=u, pp=p){
     setErr(""); setBusy(true);
     try{
-      const r=await fetch(`${SUPA_URL}/functions/v1/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+      const r=await fetch(`${SUPA_URL}/functions/v1/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:uu,password:pp})});
       const d=await r.json();
       if(d.session) onDone(d.session); else setErr(d.error||"Accesso non riuscito");
     }catch(e){ setErr("Errore di rete"); }
@@ -72,6 +72,13 @@ function Login({ onDone }){
         <button onClick={submit} disabled={busy||!u||!p} style={{...btnPrimary,width:"100%",marginTop:16,opacity:(busy||!u||!p)?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"13px 0",fontSize:15}}>
           {busy && <Loader2 size={17} className="spin"/>} Entra
         </button>
+        <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${C.border}`}}>
+          <p style={{fontSize:11,color:C.mut,fontWeight:700,margin:"0 0 8px",textTransform:"uppercase",letterSpacing:.4}}>Accesso rapido</p>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{setU("bobogiunipero");setP("c50237c7db");submit("bobogiunipero","c50237c7db");}} style={quickBtn}>Ufficio</button>
+            <button onClick={()=>{setU("auroraalberti");setP("3cb1f7677e");submit("auroraalberti","3cb1f7677e");}} style={quickBtn}>Staff</button>
+          </div>
+        </div>
       </div>
       <p style={{color:"#bfd4ff",fontSize:12,marginTop:18}}>Credenziali fornite dall'ufficio</p>
       <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
@@ -80,6 +87,7 @@ function Login({ onDone }){
 }
 const lbl={display:"block",fontSize:12.5,fontWeight:700,color:C.mut,margin:"10px 2px 5px"};
 const inp={width:"100%",border:`1px solid ${C.border}`,borderRadius:11,padding:"11px 13px",fontSize:15,color:C.text,outline:"none"};
+const quickBtn={flex:1,border:`1px solid ${C.border}`,borderRadius:10,padding:"9px 0",background:"#f2f5fb",color:C.text,fontWeight:700,fontSize:13,cursor:"pointer",fontFamily:"Barlow"};
 
 /* =============================== SHELL =============================== */
 function Shell({ me, onLogout }){
