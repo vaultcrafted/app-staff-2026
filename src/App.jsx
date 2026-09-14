@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -429,12 +429,13 @@ function EventDetail({ ev, part, onA, onBack, me }){
 function Admin({ me, onLogout, onBack }){
   const desktop=useMedia("(min-width:860px)");
   const [section,setSection]=useState("staff");
-  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["economia",Wallet,"Economia"]];
+  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["economia",Wallet,"Economia"],["contratti",FileText,"Contratti"]];
   const body = section==="staff" ? <AdminStaff/>
     : section==="eventi" ? <AdminEventi me={me}/>
     : section==="avvisi" ? <AdminComunicazioni me={me}/>
     : section==="premi" ? <AdminPremi/>
     : section==="economia" ? <AdminEconomia/>
+    : section==="contratti" ? <AdminContratti/>
     : <div style={{...card,color:C.mut,fontSize:14}}>Presenze — si gestiscono dentro ogni evento (Eventi › Gestisci presenze).</div>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
@@ -1168,6 +1169,62 @@ function EconForm({ voce, eventi, onClose, onSaved }){
         </div>
         <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
       </div>
+    </div>
+  );
+}
+
+function AdminContratti(){
+  const [rows,setRows]=useState(null); const [staff,setStaff]=useState({}); const [eventi,setEventi]=useState({});
+  const [selStaff,setSelStaff]=useState(""); const [selEvento,setSelEvento]=useState("");
+  const [uploading,setUploading]=useState(false); const [err,setErr]=useState("");
+  const fileRef=useRef();
+  async function load(){
+    const { data }=await supabase.from("contratti").select("*").order("created_at",{ascending:false}); setRows(data||[]);
+    const { data:st }=await supabase.from("staff_anagrafica").select("id,nome,cognome").order("cognome"); const sm={}; (st||[]).forEach(x=>sm[x.id]={nome:x.nome+" "+x.cognome}); setStaff(sm);
+    const { data:ev }=await supabase.from("eventi").select("id,titolo").order("inizio",{ascending:false}); const em={}; (ev||[]).forEach(x=>em[x.id]=x.titolo); setEventi(em);
+  }
+  useEffect(()=>{ load(); },[]);
+  async function onFile(e){
+    const file=e.target.files[0]; if(!file) return;
+    setUploading(true); setErr("");
+    const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path=Date.now()+"_"+safe;
+    const up=await supabase.storage.from("contratti").upload(path,file,{contentType:file.type||"application/pdf"});
+    if(up.error){ setErr(up.error.message); setUploading(false); e.target.value=""; return; }
+    await supabase.from("contratti").insert({nome:file.name,path,staff_id:selStaff||null,evento_id:selEvento||null});
+    setUploading(false); e.target.value=""; load();
+  }
+  async function scarica(r){ const { data }=await supabase.storage.from("contratti").createSignedUrl(r.path,120); if(data&&data.signedUrl) window.open(data.signedUrl,"_blank"); }
+  async function del(r){ if(!window.confirm("Eliminare questo contratto?")) return; await supabase.storage.from("contratti").remove([r.path]); await supabase.from("contratti").delete().eq("id",r.id); load(); }
+  const staffOpts=Object.entries(staff);
+  const eventiOpts=Object.entries(eventi);
+  return (
+    <div>
+      <h2 style={{...head,fontSize:22,fontWeight:800,margin:"0 0 14px"}}>Contratti</h2>
+      <div style={{...card,marginBottom:16}}>
+        <h3 style={{...sect,marginTop:0}}>Carica un contratto (PDF)</h3>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+          <select value={selStaff} onChange={e=>setSelStaff(e.target.value)} style={{...inp,width:"auto",flex:1,minWidth:150}}><option value="">Staff (facoltativo)</option>{staffOpts.map(([id,x])=><option key={id} value={id}>{x.nome}</option>)}</select>
+          <select value={selEvento} onChange={e=>setSelEvento(e.target.value)} style={{...inp,width:"auto",flex:1,minWidth:150}}><option value="">Evento (facoltativo)</option>{eventiOpts.map(([id,t])=><option key={id} value={id}>{t}</option>)}</select>
+        </div>
+        <input ref={fileRef} type="file" accept="application/pdf,.pdf" onChange={onFile} style={{display:"none"}}/>
+        <button onClick={()=>fileRef.current&&fileRef.current.click()} disabled={uploading} style={{...btnPrimary,width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"12px 0",opacity:uploading?.6:1}}>{uploading?<Loader2 size={17} className="spin"/>:<Plus size={17}/>} {uploading?"Carico…":"Scegli PDF e carica"}</button>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+      </div>
+      {rows===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : rows.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun contratto caricato.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {rows.map(r=>(
+            <div key={r.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{width:38,height:38,borderRadius:10,background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><FileText size={18} color={C.primary}/></div>
+              <div style={{flex:1,minWidth:150}}>
+                <div style={{fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome}</div>
+                <div style={{fontSize:12,color:C.mut,marginTop:2}}>{(r.staff_id&&staff[r.staff_id])?staff[r.staff_id].nome:""}{r.staff_id&&r.evento_id?" · ":""}{r.evento_id?eventi[r.evento_id]:""}{(!r.staff_id&&!r.evento_id)?fdate(r.created_at):` · ${fdate(r.created_at)}`}</div>
+              </div>
+              <button onClick={()=>scarica(r)} style={{...btnGhost,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",fontSize:13}}><Download size={15}/> Apri</button>
+              <button onClick={()=>del(r)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
+            </div>))}
+         </div>}
     </div>
   );
 }
