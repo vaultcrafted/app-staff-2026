@@ -21,6 +21,7 @@ const LOGO_B="/logo.png";
 const head={fontFamily:"'Barlow Condensed', sans-serif"};
 const ruoli={UFFICIO:"Ufficio",CA:"Capo Animazione",CM:"Capo Meta",ACM:"Aiuto Capo Meta",FOTOGRAFO:"Fotografo",VIDEOMAKER:"Videomaker",DJ:"DJ",VOCALIST:"Vocalist",BALLERINA:"Ballerino/a",STAFF:"Staff",CONTENT_CREATOR:"Content Creator",RM:"Resp. Materiali"};
 const rlabel=r=>ruoli[r]||r||"Staff";
+function useMedia(q){ const [m,setM]=useState(()=>typeof window!=="undefined"&&window.matchMedia(q).matches); useEffect(()=>{const mq=window.matchMedia(q); const h=e=>setM(e.matches); mq.addEventListener("change",h); return ()=>mq.removeEventListener("change",h);},[q]); return m; }
 
 /* =============================== ROOT =============================== */
 export default function App(){
@@ -99,11 +100,11 @@ function Shell({ me, onLogout }){
 
 /* =============================== STAFF =============================== */
 function StaffApp({ me, onLogout, isUff, openAdmin }){
+  const desktop=useMedia("(min-width:860px)");
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
   const [coms,setComs]=useState([]);
-
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -112,35 +113,38 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
     const { data:c }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
     setComs(c||[]);
   })(); },[me.id]);
-
   async function answer(ev,val){
     setRsvp(r=>({...r,[ev]:val}));
     await supabase.from("eventi_partecipazioni").upsert({evento_id:ev,staff_id:me.id,rsvp:val,rsvp_at:new Date().toISOString()},{onConflict:"evento_id,staff_id"});
   }
   const ev=events.find(e=>e.id===openEvent);
-
+  const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["profilo",User,"Profilo"]];
+  const content = ev ? <EventDetail ev={ev} answer={rsvp[ev.id]} onA={answer} onBack={()=>setOpenEvent(null)}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin}/>
+    : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
+    : tab==="avvisi" ? <SAvvisi coms={coms}/>
+    : <SProfilo me={me} onLogout={onLogout}/>;
   return (
-    <div style={{height:"100%",maxWidth:480,margin:"0 auto",background:C.bg,display:"flex",flexDirection:"column"}}>
-      <div style={{background:C.primary,padding:"14px 18px",flexShrink:0,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <img src={LOGO_W} alt="INVIBE" style={{height:22,display:"block"}}/>
-        <div style={{display:"flex",gap:14,alignItems:"center"}}>
-          <Bell size={20} color="#fff"/>
-          <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
+    <div style={{minHeight:"100%",background:C.bg,display:"flex",flexDirection:"column"}}>
+      <div style={{background:C.primary,flexShrink:0}}>
+        <div style={{maxWidth:1080,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
+          <img src={LOGO_W} alt="INVIBE" style={{height:22,display:"block"}}/>
+          {desktop && <div style={{display:"flex",gap:6}}>
+            {NAV.map(([k,Ic,l])=>{ const on=tab===k; return (
+              <button key={k} onClick={()=>{setTab(k);setOpenEvent(null);}} style={{display:"flex",alignItems:"center",gap:7,border:"none",cursor:"pointer",borderRadius:9,padding:"8px 14px",background:on?"rgba(255,255,255,0.18)":"transparent",color:"#fff",fontFamily:"Barlow",fontWeight:on?700:600,fontSize:14}}>
+                <Ic size={17}/> {l}</button>); })}
+          </div>}
+          <div style={{display:"flex",gap:14,alignItems:"center"}}>
+            <Bell size={20} color="#fff"/>
+            <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
+          </div>
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto"}}>
-        {ev ? <EventDetail ev={ev} answer={rsvp[ev.id]} onA={answer} onBack={()=>setOpenEvent(null)}/>
-         : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin}/>
-         : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
-         : tab==="avvisi" ? <SAvvisi coms={coms}/>
-         : <SProfilo me={me} onLogout={onLogout}/>}
+        <div style={{maxWidth:desktop?680:480,margin:"0 auto",width:"100%"}}>{content}</div>
       </div>
-      {!ev && <nav style={{flexShrink:0,height:64,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex"}}>
-        {[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["profilo",User,"Profilo"]].map(([k,Ic,l])=>{
-          const on=tab===k;
-          return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}>
-            <Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>;
-        })}
+      {!ev && !desktop && <nav style={{flexShrink:0,height:64,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex"}}>
+        {NAV.map(([k,Ic,l])=>{ const on=tab===k; return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}><Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>; })}
       </nav>}
     </div>
   );
