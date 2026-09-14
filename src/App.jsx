@@ -432,9 +432,11 @@ function AdminStaff(){
 function AdminEventi({ me }){
   const [rows,setRows]=useState(null);
   const [editing,setEditing]=useState(null);
+  const [detail,setDetail]=useState(null);
   async function load(){ const { data }=await supabase.from("eventi").select("*").order("inizio",{ascending:true,nullsFirst:false}); setRows(data||[]); }
   useEffect(()=>{ load(); },[]);
   async function del(id){ if(!window.confirm("Eliminare questo evento?")) return; await supabase.from("eventi").delete().eq("id",id); load(); }
+  if(detail) return <EventoPresenze ev={detail} onBack={()=>{setDetail(null);load();}}/>;
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
@@ -446,16 +448,82 @@ function AdminEventi({ me }){
        : <div style={{display:"flex",flexDirection:"column",gap:11}}>
           {rows.map(e=>{ const cat=CAT[e.categoria]||CAT.NOTTE_EVENTO; return (
             <div key={e.id} style={{...card,display:"flex",alignItems:"center",gap:10,borderLeft:`4px solid ${cat.color}`}}>
-              <div style={{flex:1,minWidth:0}}>
+              <button onClick={()=>setDetail(e)} style={{flex:1,minWidth:0,textAlign:"left",border:"none",background:"transparent",cursor:"pointer",padding:0}}>
                 <span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
                 <div style={{...head,fontSize:17,fontWeight:700,margin:"2px 0 3px"}}>{e.titolo}</div>
                 <div style={{fontSize:12.5,color:C.mut}}>{fdate(e.inizio)}{e.luogo?` · ${e.luogo}`:""}{e.zona?` · ${e.zona}`:""}</div>
-              </div>
+                <div style={{fontSize:12,color:C.primary,fontWeight:700,marginTop:6}}>Gestisci presenze ›</div>
+              </button>
               <button onClick={()=>setEditing(e)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={17}/></button>
               <button onClick={()=>del(e.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
             </div>); })}
          </div>}
       {editing!==null && <EventForm me={me} ev={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+    </div>
+  );
+}
+
+function EventoPresenze({ ev, onBack }){
+  const [staff,setStaff]=useState(null);
+  const [part,setPart]=useState({});
+  const [filter,setFilter]=useState("tutti");
+  const [q,setQ]=useState("");
+  async function load(){
+    const { data:st }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,attivo").eq("attivo",true).order("cognome");
+    setStaff(st||[]);
+    const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id,rsvp,presente").eq("evento_id",ev.id);
+    const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente}); setPart(m);
+  }
+  useEffect(()=>{ load(); },[ev.id]);
+  async function togglePresente(sid){
+    const nv=!(part[sid]&&part[sid].presente===true);
+    setPart(m=>({...m,[sid]:{...(m[sid]||{}),presente:nv}}));
+    await supabase.from("eventi_partecipazioni").upsert({evento_id:ev.id,staff_id:sid,presente:nv,presente_at:new Date().toISOString()},{onConflict:"evento_id,staff_id"});
+  }
+  const cat=CAT[ev.categoria]||CAT.NOTTE_EVENTO;
+  const all=staff||[];
+  const list=all.filter(s=>{
+    const p=part[s.id]||{};
+    if(q && !(`${s.nome} ${s.cognome}`).toLowerCase().includes(q.toLowerCase())) return false;
+    if(filter==="si") return p.rsvp==="ci_saro";
+    if(filter==="no") return p.rsvp==="non_ci_saro";
+    if(filter==="presenti") return p.presente===true;
+    if(filter==="assenti") return p.presente!==true;
+    return true;
+  });
+  const nSi=all.filter(s=>(part[s.id]||{}).rsvp==="ci_saro").length;
+  const nPres=all.filter(s=>(part[s.id]||{}).presente===true).length;
+  const chips=[["tutti","Tutti"],["si","Ci sarò"],["no","Non ci sarò"],["presenti","Presenti"],["assenti","Assenti"]];
+  return (
+    <div>
+      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"transparent",border:"none",cursor:"pointer",color:C.mut,fontSize:14,padding:"2px 0 10px",fontFamily:"Barlow"}}><ChevronLeft size={18}/> Eventi</button>
+      <div style={{...card,borderLeft:`4px solid ${cat.color}`,marginBottom:14}}>
+        <span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
+        <div style={{...head,fontSize:20,fontWeight:800,margin:"2px 0 3px"}}>{ev.titolo}</div>
+        <div style={{fontSize:12.5,color:C.mut}}>{fdate(ev.inizio)}{ev.luogo?` · ${ev.luogo}`:""}</div>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <BigStat n={nSi} l="Hanno detto sì" Ic={Check} col={C.success}/>
+        <BigStat n={nPres} l="Presenti segnati" Ic={Users} col={C.primary}/>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+        {chips.map(([k,l])=>{ const on=filter===k; return <button key={k} onClick={()=>setFilter(k)} style={{border:`1px solid ${on?C.primary:C.border}`,background:on?C.primarySoft:C.surface,color:on?C.primary:C.mut,borderRadius:999,padding:"6px 12px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:"Barlow"}}>{l}</button>; })}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:7,background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 11px",marginBottom:12,maxWidth:280}}>
+        <Search size={15} color={C.mut}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca…" style={{border:"none",outline:"none",fontSize:13,color:C.text,flex:1}}/>
+      </div>
+      {staff===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:9}}>
+          {list.map(s=>{ const p=part[s.id]||{}; const pres=p.presente===true; return (
+            <div key={s.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:150}}>
+                <div style={{fontWeight:600,fontSize:14}}>{s.nome} {s.cognome}</div>
+                <div style={{fontSize:12,color:C.mut}}>{rlabel(s.ruolo)}</div>
+              </div>
+              {p.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:p.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="Non ci sarò"/>:<Tag c={C.mut} bg="#f2f5fb" t="Nessuna risposta"/>}
+              <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
+            </div>); })}
+         </div>}
     </div>
   );
 }
