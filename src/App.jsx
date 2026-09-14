@@ -397,6 +397,7 @@ function AvvisoModal({ c, confermato, onConferma, onClose }){
 
 function SProfilo({ me, onLogout, reload }){
   const [edit,setEdit]=useState(false);
+  const [pw,setPw]=useState(false);
   const [notif,setNotif]=useState(typeof Notification!=="undefined" && Notification.permission==="granted");
   const pub=[["Ruolo",rlabel(me.ruolo)],["Zona",me.zona||"—"],["Anno d'ingresso",me.anno_ingresso||"—"],["Turni fatti",me.settimane_2025??"—"],["Taglia divisa",me.taglia_maglia||"—"]];
   const priv=[["Email",me.email||"—"],["Telefono",me.telefono||"—"],["Città",me.citta||"—"],["Indirizzo",me.indirizzo||"—"],["Codice fiscale",me.codice_fiscale||"—"]];
@@ -409,11 +410,13 @@ function SProfilo({ me, onLogout, reload }){
           <p style={{margin:"2px 0 0",color:C.mut,fontSize:13}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p></div>
       </div>
       <button onClick={()=>setEdit(true)} style={{...btnPrimary,width:"100%",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={16}/> Modifica profilo</button>
-      <button onClick={async()=>{ const ok=await attivaNotifiche(me); setNotif(ok||notif); }} style={{...btnGhost,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:notif?C.success:C.text,borderColor:notif?"#bfe6cf":C.border}}><Bell size={16}/> {notif?"Notifiche attive":"Attiva notifiche"}</button>
+      <button onClick={async()=>{ const ok=await attivaNotifiche(me); setNotif(ok||notif); }} style={{...btnGhost,width:"100%",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:notif?C.success:C.text,borderColor:notif?"#bfe6cf":C.border}}><Bell size={16}/> {notif?"Notifiche attive":"Attiva notifiche"}</button>
+      <button onClick={()=>setPw(true)} style={{...btnGhost,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>Cambia password</button>
       <h3 style={sect}>Informazioni</h3><Info rows={pub}/>
       <h3 style={{...sect,marginTop:18}}>Dati personali · solo tu e l'ufficio</h3><Info rows={priv}/>
       <button onClick={onLogout} style={{...btnGhost,width:"100%",marginTop:20,color:"#d33",borderColor:"#f0c4c4",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><LogOut size={17}/> Esci</button>
       {edit && <ProfiloEdit me={me} onClose={()=>setEdit(false)} onSaved={()=>{setEdit(false);reload();}}/>}
+      {pw && <PasswordEdit me={me} onClose={()=>setPw(false)}/>}
     </div>
   );
 }
@@ -1267,6 +1270,42 @@ function AdminContratti(){
               <button onClick={()=>del(r)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
             </div>))}
          </div>}
+    </div>
+  );
+}
+
+function PasswordEdit({ me, onClose }){
+  const [p1,setP1]=useState(""); const [p2,setP2]=useState("");
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [msg,setMsg]=useState("");
+  const ok=p1.length>=6 && p1===p2;
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr(""); setMsg("");
+    const { error }=await supabase.auth.updateUser({password:p1});
+    if(error){ setBusy(false); setErr(error.message); return; }
+    await supabase.from("staff_anagrafica").update({password_iniziale:null}).eq("id",me.id);
+    setBusy(false); setMsg("Password aggiornata"); setTimeout(onClose,1200);
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:420,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Cambia password</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <label style={lbl}>Nuova password</label>
+        <input type="password" value={p1} onChange={e=>setP1(e.target.value)} placeholder="Almeno 6 caratteri" style={inp}/>
+        <label style={lbl}>Ripeti password</label>
+        <input type="password" value={p2} onChange={e=>setP2(e.target.value)} onKeyDown={e=>e.key==="Enter"&&save()} style={inp}/>
+        {p1&&p1.length<6?<p style={{color:"#d33",fontSize:12,margin:"5px 2px 0"}}>Minimo 6 caratteri</p>:null}
+        {p1&&p2&&p1!==p2?<p style={{color:"#d33",fontSize:12,margin:"5px 2px 0"}}>Le password non coincidono</p>:null}
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+        {msg?<p style={{color:C.success,fontSize:13,fontWeight:600,margin:"8px 2px 0"}}>{msg}</p>:null}
+        <div style={{display:"flex",gap:8,marginTop:16}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} Salva</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
     </div>
   );
 }
