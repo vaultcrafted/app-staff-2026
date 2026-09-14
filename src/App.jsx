@@ -422,7 +422,7 @@ function Admin({ me, onLogout, onBack }){
 
 function AdminStaff(){
   const [rows,setRows]=useState(null); const [q,setQ]=useState(""); const [detail,setDetail]=useState(null);
-  async function load(){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,citta,email,telefono,anno_ingresso,settimane_2025,taglia_maglia,attivo").order("cognome"); setRows(data||[]); }
+  async function load(){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,sesso,nascita,citta,indirizzo,email,telefono,codice_fiscale,instagram,anno_ingresso,settimane_2024,settimane_2025,settimane_2026,taglia_maglia,professione,attivo").order("cognome"); setRows(data||[]); }
   useEffect(()=>{ load(); },[]);
   async function esporta(){
     const { data }=await supabase.from("staff_anagrafica").select("nome,cognome,ruolo,username,password_iniziale").order("cognome");
@@ -432,8 +432,27 @@ function AdminStaff(){
   }
   const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
   if(detail) return <StaffDetail id={detail} onBack={()=>{setDetail(null);load();}}/>;
-  const grid="180px 130px 110px 120px 210px 140px 64px 64px 80px 92px";
-  const H=["Nome","Ruolo","Zona","Città","Email","Telefono","Anno","Turni","Taglia","Stato"];
+  const dt=v=>v?new Date(v).toLocaleDateString("it-IT"):"—";
+  const COLS=[
+    ["Nome",r=>`${r.nome} ${r.cognome}`,"180px"],
+    ["Ruolo",r=>rlabel(r.ruolo),"130px"],
+    ["Sesso",r=>r.sesso||"—","80px"],
+    ["Nascita",r=>dt(r.nascita),"100px"],
+    ["Città",r=>r.citta||"—","120px"],
+    ["Indirizzo",r=>r.indirizzo||"—","190px"],
+    ["Email",r=>r.email||"—","210px"],
+    ["Telefono",r=>r.telefono||"—","130px"],
+    ["Cod. fiscale",r=>r.codice_fiscale||"—","150px"],
+    ["Instagram",r=>r.instagram||"—","130px"],
+    ["Anno",r=>r.anno_ingresso||"—","60px"],
+    ["S.24",r=>r.settimane_2024??"—","56px"],
+    ["S.25",r=>r.settimane_2025??"—","56px"],
+    ["S.26",r=>r.settimane_2026??"—","56px"],
+    ["Taglia",r=>r.taglia_maglia||"—","70px"],
+    ["Cosa fa",r=>r.professione||"—","170px"],
+    ["Stato",null,"92px"],
+  ];
+  const grid=COLS.map(c=>c[2]).join(" ");
   const cell={overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:C.mut};
   return (
     <div>
@@ -448,26 +467,19 @@ function AdminStaff(){
         </div>
         <button onClick={esporta} style={{...btnGhost,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",fontSize:13}}><Download size={15}/> Credenziali</button>
       </div>
-      <p style={{fontSize:12,color:C.mut,margin:"0 0 8px"}}>Scorri in orizzontale per vedere tutti i campi · tocca una riga per la scheda completa.</p>
+      <p style={{fontSize:12,color:C.mut,margin:"0 0 8px"}}>Scorri in orizzontale per vedere tutti i campi · tocca una riga per la scheda completa. (S.24/25/26 = turni per anno)</p>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
-          <div style={{minWidth:1290}}>
+          <div style={{minWidth:2000}}>
             <div style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.3}}>
-              {H.map(h=><span key={h} style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h}</span>)}
+              {COLS.map(c=><span key={c[0]} style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c[0]}</span>)}
             </div>
             {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
             : filt.map((r,i)=>(
               <div key={r.id} onClick={()=>setDetail(r.id)} style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13,cursor:"pointer"}}>
-                <span style={{fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}</span>
-                <span style={cell}>{rlabel(r.ruolo)}</span>
-                <span style={cell}>{r.zona||"—"}</span>
-                <span style={cell}>{r.citta||"—"}</span>
-                <span style={cell}>{r.email||"—"}</span>
-                <span style={cell}>{r.telefono||"—"}</span>
-                <span style={cell}>{r.anno_ingresso||"—"}</span>
-                <span style={cell}>{r.settimane_2025??"—"}</span>
-                <span style={cell}>{r.taglia_maglia||"—"}</span>
-                <span>{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
+                {COLS.map((c,ci)=> c[0]==="Stato"
+                  ? <span key="stato">{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
+                  : <span key={c[0]} style={ci===0?{fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}:cell}>{c[1](r)}</span>)}
               </div>))}
           </div>
         </div>
