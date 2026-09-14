@@ -22,6 +22,21 @@ const head={fontFamily:"'Barlow Condensed', sans-serif"};
 const ruoli={UFFICIO:"Ufficio",CA:"Capo Animazione",CM:"Capo Meta",ACM:"Aiuto Capo Meta",FOTOGRAFO:"Fotografo",VIDEOMAKER:"Videomaker",DJ:"DJ",VOCALIST:"Vocalist",BALLERINA:"Ballerino/a",STAFF:"Staff",CONTENT_CREATOR:"Content Creator",RM:"Resp. Materiali"};
 const rlabel=r=>ruoli[r]||r||"Staff";
 const isDonna=x=>{const v=(x||"").toUpperCase();return v.startsWith("D")||v.startsWith("F");};
+const VAPID_PUBLIC="BORRtvXlPR6H4TDNvq9x41WbjyIeuQ3v45MKvcesotxjmRMyvWAqm6kYCEj2rK1BlCyw0mEVpHb_04vVcFHpCDI";
+function urlB64ToUint8Array(b){ const pad="=".repeat((4-b.length%4)%4); const s2=(b+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s2); const out=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i); return out; }
+async function attivaNotifiche(me){
+  try{
+    if(!("serviceWorker" in navigator) || !("PushManager" in window)){ alert("Le notifiche non sono supportate su questo dispositivo."); return false; }
+    const perm=await Notification.requestPermission();
+    if(perm!=="granted") return false;
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8Array(VAPID_PUBLIC)});
+    const j=sub.toJSON();
+    await supabase.from("push_subscriptions").upsert({staff_id:me.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:"endpoint"});
+    return true;
+  }catch(e){ alert("Non è stato possibile attivare le notifiche."); return false; }
+}
 function useMedia(q){ const [m,setM]=useState(()=>typeof window!=="undefined"&&window.matchMedia(q).matches); useEffect(()=>{const mq=window.matchMedia(q); const h=e=>setM(e.matches); mq.addEventListener("change",h); return ()=>mq.removeEventListener("change",h);},[q]); return m; }
 
 /* =============================== ROOT =============================== */
@@ -36,6 +51,7 @@ export default function App(){
     setMe(data||null);
   }
   useEffect(()=>{ (async()=>{ await loadMe(); setReady(true); })(); },[]);
+  useEffect(()=>{ if("serviceWorker" in navigator){ navigator.serviceWorker.register("/sw.js").catch(()=>{}); } },[]);
 
   if(!ready) return <Splash/>;
   if(!me) return <Login onDone={async(sess)=>{ await supabase.auth.setSession(sess); await loadMe(); }}/>;
@@ -358,6 +374,7 @@ function SAvvisi({ coms, letto, conferma }){
 
 function SProfilo({ me, onLogout, reload }){
   const [edit,setEdit]=useState(false);
+  const [notif,setNotif]=useState(typeof Notification!=="undefined" && Notification.permission==="granted");
   const pub=[["Ruolo",rlabel(me.ruolo)],["Zona",me.zona||"—"],["Anno d'ingresso",me.anno_ingresso||"—"],["Turni fatti",me.settimane_2025??"—"],["Taglia divisa",me.taglia_maglia||"—"]];
   const priv=[["Email",me.email||"—"],["Telefono",me.telefono||"—"],["Città",me.citta||"—"],["Indirizzo",me.indirizzo||"—"],["Codice fiscale",me.codice_fiscale||"—"]];
   const ini=((me.nome||" ")[0]+(me.cognome||" ")[0]).toUpperCase();
@@ -368,7 +385,8 @@ function SProfilo({ me, onLogout, reload }){
         <div><h1 style={{...head,fontSize:23,fontWeight:800,margin:0}}>{me.nome} {me.cognome}</h1>
           <p style={{margin:"2px 0 0",color:C.mut,fontSize:13}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p></div>
       </div>
-      <button onClick={()=>setEdit(true)} style={{...btnPrimary,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={16}/> Modifica profilo</button>
+      <button onClick={()=>setEdit(true)} style={{...btnPrimary,width:"100%",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={16}/> Modifica profilo</button>
+      <button onClick={async()=>{ const ok=await attivaNotifiche(me); setNotif(ok||notif); }} style={{...btnGhost,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:notif?C.success:C.text,borderColor:notif?"#bfe6cf":C.border}}><Bell size={16}/> {notif?"Notifiche attive":"Attiva notifiche"}</button>
       <h3 style={sect}>Informazioni</h3><Info rows={pub}/>
       <h3 style={{...sect,marginTop:18}}>Dati personali · solo tu e l'ufficio</h3><Info rows={priv}/>
       <button onClick={onLogout} style={{...btnGhost,width:"100%",marginTop:20,color:"#d33",borderColor:"#f0c4c4",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><LogOut size={17}/> Esci</button>
@@ -764,6 +782,7 @@ function ComForm({ me, com, onClose, onSaved }){
     else { ({ error }=await supabase.from("comunicazioni").insert({...payload,created_by:me.id})); }
     setBusy(false);
     if(error){ setErr(error.message); return; }
+    if(!isEdit){ try{ await supabase.functions.invoke("send-push",{body:{title:f.titolo.trim(),body:(f.corpo.trim()||"Nuova comunicazione")}}); }catch(e){} }
     onSaved();
   }
   return (
@@ -1243,6 +1262,7 @@ function EventForm({ me, ev, onClose, onSaved }){
     else { ({ error }=await supabase.from("eventi").insert({...payload,created_by:me.id})); }
     setBusy(false);
     if(error){ setErr(error.message); return; }
+    if(!isEdit){ try{ await supabase.functions.invoke("send-push",{body:{title:"Nuovo evento in programma",body:f.titolo.trim()+(f.luogo.trim()?(" · "+f.luogo.trim()):"")}}); }catch(e){} }
     onSaved();
   }
   return (
