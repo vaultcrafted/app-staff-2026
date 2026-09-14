@@ -422,7 +422,7 @@ function Admin({ me, onLogout, onBack }){
 
 function AdminStaff(){
   const [rows,setRows]=useState(null); const [q,setQ]=useState(""); const [detail,setDetail]=useState(null);
-  async function load(){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,attivo").order("cognome"); setRows(data||[]); }
+  async function load(){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,citta,email,telefono,anno_ingresso,settimane_2025,taglia_maglia,attivo").order("cognome"); setRows(data||[]); }
   useEffect(()=>{ load(); },[]);
   async function esporta(){
     const { data }=await supabase.from("staff_anagrafica").select("nome,cognome,ruolo,username,password_iniziale").order("cognome");
@@ -432,6 +432,9 @@ function AdminStaff(){
   }
   const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
   if(detail) return <StaffDetail id={detail} onBack={()=>{setDetail(null);load();}}/>;
+  const grid="180px 130px 110px 120px 210px 140px 64px 64px 80px 92px";
+  const H=["Nome","Ruolo","Zona","Città","Email","Telefono","Anno","Turni","Taglia","Stato"];
+  const cell={overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:C.mut};
   return (
     <div>
       <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
@@ -445,18 +448,29 @@ function AdminStaff(){
         </div>
         <button onClick={esporta} style={{...btnGhost,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",fontSize:13}}><Download size={15}/> Credenziali</button>
       </div>
+      <p style={{fontSize:12,color:C.mut,margin:"0 0 8px"}}>Scorri in orizzontale per vedere tutti i campi · tocca una riga per la scheda completa.</p>
       <div style={{...card,padding:0,overflow:"hidden"}}>
-        <div style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11.5,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.4}}>
-          <span>Nome</span><span>Ruolo</span><span>Zona</span><span>Stato</span>
+        <div style={{overflowX:"auto"}}>
+          <div style={{minWidth:1290}}>
+            <div style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.3}}>
+              {H.map(h=><span key={h} style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{h}</span>)}
+            </div>
+            {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
+            : filt.map((r,i)=>(
+              <div key={r.id} onClick={()=>setDetail(r.id)} style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13,cursor:"pointer"}}>
+                <span style={{fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}</span>
+                <span style={cell}>{rlabel(r.ruolo)}</span>
+                <span style={cell}>{r.zona||"—"}</span>
+                <span style={cell}>{r.citta||"—"}</span>
+                <span style={cell}>{r.email||"—"}</span>
+                <span style={cell}>{r.telefono||"—"}</span>
+                <span style={cell}>{r.anno_ingresso||"—"}</span>
+                <span style={cell}>{r.settimane_2025??"—"}</span>
+                <span style={cell}>{r.taglia_maglia||"—"}</span>
+                <span>{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
+              </div>))}
+          </div>
         </div>
-        {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
-        : filt.map((r,i)=>(
-          <div key={r.id} onClick={()=>setDetail(r.id)} style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"12px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13.5,cursor:"pointer"}}>
-            <span style={{fontWeight:600}}>{r.nome} {r.cognome}</span>
-            <span style={{color:C.mut}}>{rlabel(r.ruolo)}</span>
-            <span style={{color:C.mut}}>{r.zona||"—"}</span>
-            <span>{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
-          </div>))}
       </div>
     </div>
   );
