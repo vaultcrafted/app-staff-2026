@@ -219,6 +219,8 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
   const ev=events.find(e=>e.id===openEvent);
   const myPunti=(classifica.find(x=>x.staff_id===me.id)||{}).punti||0;
+  const [notifOpen,setNotifOpen]=useState(false); const [avvisoOpen,setAvvisoOpen]=useState(null);
+  const unread=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]).length;
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica}/>
@@ -237,7 +239,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
                 <Ic size={17}/> {l}</button>); })}
           </div>}
           <div style={{display:"flex",gap:14,alignItems:"center"}}>
-            <Bell size={20} color="#fff"/>
+            <button onClick={()=>setNotifOpen(true)} style={{...iconBtn,position:"relative"}}><Bell size={20} color="#fff"/>{unread>0 && <span style={{position:"absolute",top:-5,right:-5,minWidth:16,height:16,borderRadius:8,background:"#ff4d4f",color:"#fff",fontSize:10,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 3px"}}>{unread}</span>}</button>
             <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
           </div>
         </div>
@@ -248,8 +250,31 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
       {!ev && !desktop && <nav style={{position:"fixed",bottom:0,left:0,right:0,height:64,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:50}}>
         {NAV.map(([k,Ic,l])=>{ const on=tab===k; return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}><Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>; })}
       </nav>}
+      {notifOpen && (
+        <div onClick={()=>setNotifOpen(false)} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(0,0,0,0.15)"}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:58,right:12,left:12,maxWidth:400,marginLeft:"auto",background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 20px 50px rgba(20,40,80,0.22)",maxHeight:"72vh",overflowY:"auto"}}>
+            <div style={{padding:"13px 16px",fontFamily:"'Barlow Condensed', sans-serif",fontWeight:800,fontSize:17}}>Notifiche</div>
+            {(()=>{ const uncon=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]); const up=(events||[]).slice(0,5); const otherC=(coms||[]).filter(c=>!(c.richiede_conferma && !letto[c.id])).slice(0,6);
+              if(uncon.length===0 && up.length===0 && otherC.length===0) return <div style={{padding:"6px 16px 18px",color:C.mut,fontSize:13}}>Nessuna notifica.</div>;
+              return <div>
+                {uncon.map(c=><NotifRow key={c.id} color={C.amber} title={c.titolo} sub="Da confermare" onClick={()=>{ setNotifOpen(false); setAvvisoOpen(c); }}/>)}
+                {up.map(e=>{ const cat=CAT[e.categoria]||CAT.NOTTE_EVENTO; return <NotifRow key={e.id} color={cat.color} title={e.titolo} sub={cat.label+" · "+fdate(e.inizio)} onClick={()=>{ setNotifOpen(false); setOpenEvent(e.id); }}/>; })}
+                {otherC.map(c=><NotifRow key={c.id} color={C.primary} title={c.titolo} sub={"Avviso · "+fdate(c.created_at)} onClick={()=>{ setNotifOpen(false); setAvvisoOpen(c); }}/>)}
+              </div>; })()}
+          </div>
+        </div>
+      )}
+      {avvisoOpen && <AvvisoModal c={avvisoOpen} confermato={!!letto[avvisoOpen.id]} onConferma={()=>conferma(avvisoOpen.id)} onClose={()=>setAvvisoOpen(null)}/>}
     </div>
   );
+}
+
+function NotifRow({ color, title, sub, onClick }){
+  return <button onClick={onClick} style={{width:"100%",textAlign:"left",background:"transparent",border:"none",borderTop:`1px solid ${C.border}`,cursor:"pointer",padding:"12px 16px",display:"flex",gap:10,alignItems:"center"}}>
+    <span style={{width:8,height:8,borderRadius:4,background:color,flexShrink:0}}/>
+    <span style={{flex:1,minWidth:0}}><span style={{display:"block",fontWeight:700,fontSize:14,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{title}</span><span style={{display:"block",fontSize:12,color:C.mut,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sub}</span></span>
+    <ChevronRight size={16} color={C.mut}/>
+  </button>;
 }
 
 function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica }){
