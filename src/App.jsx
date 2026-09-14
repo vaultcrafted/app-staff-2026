@@ -141,9 +141,9 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto"}}>
-        <div style={{maxWidth:desktop?680:480,margin:"0 auto",width:"100%"}}>{content}</div>
+        <div style={{maxWidth:desktop?680:480,margin:"0 auto",width:"100%",paddingBottom:desktop?0:86}}>{content}</div>
       </div>
-      {!ev && !desktop && <nav style={{flexShrink:0,height:64,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex"}}>
+      {!ev && !desktop && <nav style={{position:"fixed",bottom:0,left:0,right:0,height:64,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:50}}>
         {NAV.map(([k,Ic,l])=>{ const on=tab===k; return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}><Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>; })}
       </nav>}
     </div>
@@ -305,7 +305,7 @@ function Admin({ me, onLogout, onBack }){
           </div>
           <img src={LOGO_W} alt="INVIBE" style={{height:20}}/>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:20}}>
+        <div style={{flex:1,overflowY:"auto",padding:20,paddingBottom:desktop?20:96}}>
           <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
             <BigStat n={rows?rows.length:"…"} l="Staff totali" Ic={Users} col={C.primary}/>
             <BigStat n={rows?rows.filter(r=>r.attivo).length:"…"} l="Attivi" Ic={Check} col={C.success}/>
@@ -333,7 +333,7 @@ function Admin({ me, onLogout, onBack }){
         </div>
       </div>
       {!desktop &&
-      <nav style={{flexShrink:0,background:C.sidebar,display:"flex",borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+      <nav style={{position:"fixed",bottom:0,left:0,right:0,background:C.sidebar,display:"flex",borderTop:"1px solid rgba(255,255,255,0.08)",zIndex:50}}>
         {NAV.map(([Ic,l],i)=>(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:i===0?"#fff":C.sidebarMut}}><Ic size={20}/><span style={{fontSize:10,fontWeight:i===0?700:500}}>{l}</span></div>))}
         <button onClick={onLogout} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:C.sidebarMut}}><LogOut size={20}/><span style={{fontSize:10}}>Esci</span></button>
       </nav>}
