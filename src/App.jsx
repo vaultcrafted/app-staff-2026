@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -204,7 +204,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const ev=events.find(e=>e.id===openEvent);
   const myPunti=(classifica.find(x=>x.staff_id===me.id)||{}).punti||0;
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
-  const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)}/>
+  const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
@@ -377,11 +377,14 @@ function SProfilo({ me, onLogout, reload }){
   );
 }
 
-function EventDetail({ ev, part, onA, onBack }){
+function EventDetail({ ev, part, onA, onBack, me }){
   const cat=CAT[ev.categoria]||CAT.NOTTE_EVENTO;
   const rs=part.rsvp;
   const [citta,setCitta]=useState(part.citta_partenza||"");
   const [auto,setAuto]=useState(part.ha_macchina);
+  const [voto,setVoto]=useState(0); const [commento,setCommento]=useState("");
+  useEffect(()=>{ supabase.from("valutazioni").select("voto,commento").eq("evento_id",ev.id).eq("staff_id",me.id).eq("tipo","staff_su_evento").maybeSingle().then(({data})=>{ if(data){ setVoto(data.voto||0); setCommento(data.commento||""); } }); },[ev.id]);
+  async function saveVal(v,c){ await supabase.from("valutazioni").upsert({evento_id:ev.id,staff_id:me.id,tipo:"staff_su_evento",voto:v||null,commento:(c||"").trim()||null},{onConflict:"evento_id,staff_id,tipo"}); }
   const tb=(active)=>({flex:1,cursor:"pointer",borderRadius:11,padding:"11px 0",fontFamily:"Barlow",fontWeight:700,fontSize:14,border:active?"none":`1px solid ${C.border}`,background:active?C.primary:C.surface,color:active?"#fff":C.text});
   return (
     <div style={{paddingBottom:28}}>
@@ -413,6 +416,11 @@ function EventDetail({ ev, part, onA, onBack }){
           </div>
         )}
         {rs && <p style={{fontSize:12.5,color:C.mut,margin:"12px 2px 0"}}>{rs==="ci_saro"?"Risposta salvata. L'ufficio confermerà la presenza alla serata.":"Ok, l'ufficio è stato avvisato."}</p>}
+      </div>
+      <div style={{margin:"22px 16px 0"}}>
+        <p style={{...head,fontSize:15,fontWeight:700,margin:"0 0 8px"}}>La tua valutazione dell'evento</p>
+        <Stars value={voto} onSelect={n=>{ setVoto(n); saveVal(n,commento); }}/>
+        <textarea value={commento} onChange={e=>setCommento(e.target.value)} onBlur={()=>saveVal(voto,commento)} rows={2} placeholder="Un commento (facoltativo)" style={{...inp,resize:"vertical",marginTop:8}}/>
       </div>
     </div>
   );
@@ -592,6 +600,8 @@ function AdminEventi({ me }){
 function EventoPresenze({ ev, onBack }){
   const [staff,setStaff]=useState(null);
   const [part,setPart]=useState({});
+  const [valut,setValut]=useState({});
+  const [valOpen,setValOpen]=useState(null);
   const [filter,setFilter]=useState("tutti");
   const [q,setQ]=useState("");
   async function load(){
@@ -599,6 +609,8 @@ function EventoPresenze({ ev, onBack }){
     setStaff(st||[]);
     const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id,rsvp,presente,citta_partenza,ha_macchina").eq("evento_id",ev.id);
     const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente,citta_partenza:p.citta_partenza,ha_macchina:p.ha_macchina}); setPart(m);
+    const { data:vv }=await supabase.from("valutazioni").select("staff_id,voto,commento").eq("evento_id",ev.id).eq("tipo","uff_su_staff");
+    const vm={}; (vv||[]).forEach(x=>vm[x.staff_id]={voto:x.voto,commento:x.commento}); setValut(vm);
   }
   useEffect(()=>{ load(); },[ev.id]);
   async function togglePresente(sid){
@@ -624,8 +636,8 @@ function EventoPresenze({ ev, onBack }){
   const nAuto=all.filter(s=>(part[s.id]||{}).ha_macchina===true).length;
   const chips=[["tutti","Tutti"],["si","Ci sarò"],["no","Non ci sarò"],["presenti","Presenti"],["assenti","Assenti"],["auto","Con macchina"]];
   function esporta(){
-    const lines=[["Nome","Cognome","Ruolo","Disponibilità","Città partenza","Macchina","Presente"]];
-    all.forEach(s=>{ const p=part[s.id]||{}; lines.push([s.nome,s.cognome,rlabel(s.ruolo), p.rsvp==="ci_saro"?"Ci sarò":p.rsvp==="non_ci_saro"?"Non ci sarò":"—", p.citta_partenza||"", macchinaTxt(p.ha_macchina), p.presente===true?"Sì":"No"]); });
+    const lines=[["Nome","Cognome","Ruolo","Disponibilità","Città partenza","Macchina","Presente","Voto"]];
+    all.forEach(s=>{ const p=part[s.id]||{}; const v=valut[s.id]||{}; lines.push([s.nome,s.cognome,rlabel(s.ruolo), p.rsvp==="ci_saro"?"Ci sarò":p.rsvp==="non_ci_saro"?"Non ci sarò":"—", p.citta_partenza||"", macchinaTxt(p.ha_macchina), p.presente===true?"Sì":"No", v.voto||""]); });
     const csv=lines.map(r=>r.map(x=>`"${(x==null?"":String(x)).replace(/"/g,String.fromCharCode(34)+String.fromCharCode(34))}"`).join(",")).join(String.fromCharCode(10));
     downloadCSV("resoconto-"+(ev.titolo||"evento")+".csv",csv);
   }
@@ -653,17 +665,45 @@ function EventoPresenze({ ev, onBack }){
       </div>
       {staff===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
        : <div style={{display:"flex",flexDirection:"column",gap:9}}>
-          {list.map(s=>{ const p=part[s.id]||{}; const pres=p.presente===true; return (
+          {list.map(s=>{ const p=part[s.id]||{}; const pres=p.presente===true; const v=valut[s.id]||{}; return (
             <div key={s.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:160}}>
+              <div style={{flex:1,minWidth:150}}>
                 <div style={{fontWeight:600,fontSize:14}}>{s.nome} {s.cognome}</div>
                 <div style={{fontSize:12,color:C.mut}}>{rlabel(s.ruolo)}</div>
                 {p.rsvp==="ci_saro" && <div style={{fontSize:12,color:C.mut,marginTop:3}}>Parte da: {p.citta_partenza||"—"} · Macchina: {macchinaTxt(p.ha_macchina)}</div>}
               </div>
               {p.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:p.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="Non ci sarò"/>:<Tag c={C.mut} bg="#f2f5fb" t="Nessuna risposta"/>}
+              <button onClick={()=>setValOpen(s)} style={{border:`1px solid ${C.border}`,background:C.surface,cursor:"pointer",borderRadius:9,padding:"7px 10px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,color:v.voto?C.amber:C.mut,display:"flex",alignItems:"center",gap:5}}><Star size={14} color={C.amber} fill={v.voto?C.amber:"none"}/>{v.voto?v.voto:"Valuta"}</button>
               <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
             </div>); })}
          </div>}
+      {valOpen && <ValutaStaff ev={ev} staff={valOpen} existing={valut[valOpen.id]||{}} onClose={()=>setValOpen(null)} onSaved={()=>{setValOpen(null);load();}}/>}
+    </div>
+  );
+}
+
+function Stars({ value, onSelect, size }){
+  return <div style={{display:"flex",gap:4}}>{[1,2,3,4,5].map(n=><button key={n} onClick={()=>onSelect(n)} style={{background:"transparent",border:"none",cursor:"pointer",padding:2}}><Star size={size||24} color={C.amber} fill={n<=(value||0)?C.amber:"none"}/></button>)}</div>;
+}
+
+function ValutaStaff({ ev, staff, existing, onClose, onSaved }){
+  const [voto,setVoto]=useState(existing.voto||0); const [commento,setCommento]=useState(existing.commento||""); const [busy,setBusy]=useState(false);
+  async function save(){ setBusy(true); await supabase.from("valutazioni").upsert({evento_id:ev.id,staff_id:staff.id,tipo:"uff_su_staff",voto:voto||null,commento:commento.trim()||null},{onConflict:"evento_id,staff_id,tipo"}); setBusy(false); onSaved(); }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:420,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <h3 style={{...head,fontSize:19,fontWeight:800,margin:0}}>Valuta {staff.nome} {staff.cognome}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <Stars value={voto} onSelect={setVoto}/>
+        <textarea value={commento} onChange={e=>setCommento(e.target.value)} rows={3} placeholder="Commento (facoltativo)" style={{...inp,resize:"vertical",marginTop:12}}/>
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={busy} style={{...btnPrimary,flex:1,opacity:busy?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} Salva</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
     </div>
   );
 }
