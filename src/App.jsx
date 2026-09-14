@@ -197,7 +197,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
-  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]); const [riscatti,setRiscatti]=useState([]);
+  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]); const [riscatti,setRiscatti]=useState([]); const [novita,setNovita]=useState([]);
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -209,6 +209,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     const lm={}; (le||[]).forEach(x=>{ if(x.confermata_at) lm[x.comunicazione_id]=true; }); setLetto(lm);
     const { data:cl }=await supabase.rpc("classifica"); setClassifica(cl||[]);
     await loadRiscatti();
+    const { data:nv }=await supabase.from("novita").select("*").eq("attivo",true).order("created_at",{ascending:false}); setNovita(nv||[]);
   })(); },[me.id]);
   async function answer(ev,patch){
     setRsvp(r=>({...r,[ev]:{...(r[ev]||{}),...patch}}));
@@ -224,7 +225,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const closeNotif=()=>{ setNotifClosing(true); setTimeout(()=>{ setNotifOpen(false); setNotifClosing(false); },210); };
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
-    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica} novita={novita}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : tab==="premi" ? <SPremi me={me} myPunti={myPunti} riscatti={riscatti} reloadRiscatti={loadRiscatti}/>
@@ -278,7 +279,7 @@ function NotifRow({ color, title, sub, onClick }){
   </button>;
 }
 
-function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica }){
+function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica, novita }){
   const [openAvviso,setOpenAvviso]=useState(null);
   const upcoming=events.slice(0,6);
   const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
@@ -344,11 +345,12 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
               </button>); })}
           </div>}
 
-      <h3 style={sect}>Novità</h3>
-      <div style={{display:"flex",flexDirection:"column",gap:11}}>
-        <News tag="Reunion" color={C.accent} title="Aperte le iscrizioni al Reunion" body="Segna la data: la grande rimpatriata dello staff." time="di recente"/>
-        <News tag="Merch" color={C.primary} title="Nuovo merch INVIBE in sede" body="Poli e felpe nuove disponibili. Passa a ritirarle." time="di recente"/>
-      </div>
+      {(novita||[]).length>0 && <>
+        <h3 style={sect}>Novità</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {novita.map((n,i)=><News key={n.id} tag={n.tag||"Novità"} color={i%2?C.primary:C.accent} title={n.titolo} body={n.corpo||""} time={fdate(n.created_at)}/>)}
+        </div>
+      </>}
       <h3 style={{...sect,marginTop:24}}>Classifica</h3>
       <div style={card}>
         {top.length===0 ? <span style={{color:C.mut,fontSize:13}}>Ancora nessun punto assegnato. Partecipa agli eventi!</span>
@@ -784,14 +786,18 @@ function AdminComunicazioni({ me }){
   const [rows,setRows]=useState(null);
   const [editing,setEditing]=useState(null);
   const [counts,setCounts]=useState({});
+  const [nov,setNov]=useState(null);
+  const [editingN,setEditingN]=useState(null);
   async function load(){
     const { data }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
     setRows(data||[]);
     const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at");
     const c={}; (le||[]).forEach(x=>{ if(x.confermata_at) c[x.comunicazione_id]=(c[x.comunicazione_id]||0)+1; }); setCounts(c);
+    const { data:nv }=await supabase.from("novita").select("*").order("created_at",{ascending:false}); setNov(nv||[]);
   }
   useEffect(()=>{ load(); },[]);
   async function del(id){ if(!window.confirm("Eliminare questa comunicazione?")) return; await supabase.from("comunicazioni").delete().eq("id",id); load(); }
+  async function delN(id){ if(!window.confirm("Eliminare questa novità?")) return; await supabase.from("novita").delete().eq("id",id); load(); }
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
@@ -815,7 +821,78 @@ function AdminComunicazioni({ me }){
               <button onClick={()=>del(c.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
             </div>))}
          </div>}
+
+      <div style={{display:"flex",alignItems:"center",gap:10,marginTop:26,marginBottom:12}}>
+        <div style={{flex:1}}>
+          <h2 style={{...head,fontSize:22,fontWeight:800,margin:0}}>Novità in Home</h2>
+          <p style={{fontSize:12.5,color:C.mut,margin:"2px 0 0"}}>Card informative mostrate nella Home dello staff.</p>
+        </div>
+        <button onClick={()=>setEditingN({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuova</button>
+      </div>
+      {nov===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : nov.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessuna novità. Creane una per la Home.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {nov.map(n=>(
+            <div key={n.id} style={{...card,display:"flex",alignItems:"flex-start",gap:10,borderLeft:`3px solid ${C.accent}`}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                  {n.tag && <span style={{fontSize:10.5,fontWeight:700,color:C.accent}}>{n.tag.toUpperCase()}</span>}
+                  {!n.attivo && <span style={{fontSize:10,fontWeight:700,color:C.mut,background:"#eef1f6",borderRadius:6,padding:"2px 7px"}}>NASCOSTA</span>}
+                </div>
+                <div style={{...head,fontSize:16,fontWeight:700}}>{n.titolo}</div>
+                {n.corpo && <p style={{margin:"3px 0 0",fontSize:13,color:C.mut,lineHeight:1.45}}>{n.corpo}</p>}
+              </div>
+              <button onClick={()=>setEditingN(n)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={17}/></button>
+              <button onClick={()=>delN(n.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
+            </div>))}
+         </div>}
+
       {editing!==null && <ComForm me={me} com={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+      {editingN!==null && <NovitaForm nov={editingN} onClose={()=>setEditingN(null)} onSaved={()=>{setEditingN(null);load();}}/>}
+    </div>
+  );
+}
+
+function NovitaForm({ nov, onClose, onSaved }){
+  const isEdit=!!nov.id;
+  const [f,setF]=useState({tag:nov.tag||"",titolo:nov.titolo||"",corpo:nov.corpo||"",attivo:nov.id?!!nov.attivo:true});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const ok=f.titolo.trim();
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const payload={tag:f.tag.trim()||null,titolo:f.titolo.trim(),corpo:f.corpo.trim()||null,attivo:f.attivo};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("novita").update(payload).eq("id",nov.id)); }
+    else { ({ error }=await supabase.from("novita").insert(payload)); }
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onSaved();
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica novità":"Nuova novità"}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <label style={lbl}>Etichetta (facoltativa)</label>
+        <input value={f.tag} onChange={e=>set("tag",e.target.value)} placeholder="Es. Reunion, Merch, Formazione" style={inp}/>
+        <label style={lbl}>Titolo *</label>
+        <input value={f.titolo} onChange={e=>set("titolo",e.target.value)} placeholder="Es. Aperte le iscrizioni al Reunion" style={inp}/>
+        <label style={lbl}>Testo</label>
+        <textarea value={f.corpo} onChange={e=>set("corpo",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
+        <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
+          <input type="checkbox" checked={f.attivo} onChange={e=>set("attivo",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
+          <span style={{fontSize:13.5,color:C.text}}>Mostra in Home</span>
+        </label>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Pubblica"}</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
     </div>
   );
 }
