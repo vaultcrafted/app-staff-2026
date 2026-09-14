@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -360,17 +360,19 @@ function EventDetail({ ev, answer, onA, onBack }){
 /* =============================== ADMIN =============================== */
 function Admin({ me, onLogout, onBack }){
   const desktop=useMedia("(min-width:860px)");
-  const [rows,setRows]=useState(null); const [q,setQ]=useState("");
-  useEffect(()=>{ supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,attivo").order("cognome").then(({data})=>setRows(data||[])); },[]);
-  const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
-  const NAV=[[Users,"Staff"],[Calendar,"Eventi"],[Check,"Presenze"],[MessageSquare,"Avvisi"]];
+  const [section,setSection]=useState("staff");
+  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"]];
+  const body = section==="staff" ? <AdminStaff/>
+    : section==="eventi" ? <AdminEventi me={me}/>
+    : <div style={{...card,color:C.mut,fontSize:14}}>{section==="presenze"?"Presenze":"Comunicazioni"} — in arrivo nel prossimo blocco.</div>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       {desktop &&
       <div style={{width:92,background:C.sidebar,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16}}>
         <img src={LOGO_W} alt="INVIBE" style={{width:34,marginBottom:20}}/>
-        <div style={{flex:1,display:"flex",flexDirection:"column",gap:6}}>
-          {NAV.map(([Ic,l],i)=>(<div key={i} style={{width:92,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 0",color:i===0?"#fff":C.sidebarMut}}><Ic size={21}/><span style={{fontSize:10.5,fontWeight:i===0?700:500}}>{l}</span></div>))}
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:6,width:92}}>
+          {NAV.map(([k,Ic,l])=>{ const on=section===k; return (
+            <button key={k} onClick={()=>setSection(k)} style={{width:92,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 0",color:on?"#fff":C.sidebarMut}}><Ic size={21}/><span style={{fontSize:10.5,fontWeight:on?700:500}}>{l}</span></button>); })}
         </div>
         <button onClick={onLogout} style={{...iconBtn,color:C.sidebarMut,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 0"}}><LogOut size={20}/><span style={{fontSize:10.5}}>Esci</span></button>
       </div>}
@@ -382,41 +384,134 @@ function Admin({ me, onLogout, onBack }){
           </div>
           <img src={LOGO_W} alt="INVIBE" style={{height:20}}/>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:20,paddingBottom:desktop?20:96}}>
-          <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
-            <BigStat n={rows?rows.length:"…"} l="Staff totali" Ic={Users} col={C.primary}/>
-            <BigStat n={rows?rows.filter(r=>r.attivo).length:"…"} l="Attivi" Ic={Check} col={C.success}/>
-          </div>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-            <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Anagrafica staff</h2>
-            <div style={{display:"flex",alignItems:"center",gap:7,background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 11px"}}>
-              <Search size={15} color={C.mut}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca…" style={{border:"none",outline:"none",fontSize:13,color:C.text,width:120}}/>
-            </div>
-            <button style={{...btnPrimary,width:"auto",display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuovo evento</button>
-          </div>
-          <div style={{...card,padding:0,overflow:"hidden"}}>
-            <div style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11.5,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.4}}>
-              <span>Nome</span><span>Ruolo</span><span>Zona</span><span>Stato</span>
-            </div>
-            {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
-            : filt.map((r,i)=>(
-              <div key={r.id} style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"12px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13.5}}>
-                <span style={{fontWeight:600}}>{r.nome} {r.cognome}</span>
-                <span style={{color:C.mut}}>{rlabel(r.ruolo)}</span>
-                <span style={{color:C.mut}}>{r.zona||"—"}</span>
-                <span>{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
-              </div>))}
-          </div>
-        </div>
+        <div style={{flex:1,overflowY:"auto",padding:20,paddingBottom:desktop?20:96}}>{body}</div>
       </div>
       {!desktop &&
       <nav style={{position:"fixed",bottom:0,left:0,right:0,background:C.sidebar,display:"flex",borderTop:"1px solid rgba(255,255,255,0.08)",zIndex:50}}>
-        {NAV.map(([Ic,l],i)=>(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:i===0?"#fff":C.sidebarMut}}><Ic size={20}/><span style={{fontSize:10,fontWeight:i===0?700:500}}>{l}</span></div>))}
+        {NAV.map(([k,Ic,l])=>{ const on=section===k; return (
+          <button key={k} onClick={()=>setSection(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:on?"#fff":C.sidebarMut}}><Ic size={20}/><span style={{fontSize:10,fontWeight:on?700:500}}>{l}</span></button>); })}
         <button onClick={onLogout} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:C.sidebarMut}}><LogOut size={20}/><span style={{fontSize:10}}>Esci</span></button>
       </nav>}
     </div>
   );
 }
+
+function AdminStaff(){
+  const [rows,setRows]=useState(null); const [q,setQ]=useState("");
+  useEffect(()=>{ supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,attivo").order("cognome").then(({data})=>setRows(data||[])); },[]);
+  const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
+  return (
+    <div>
+      <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
+        <BigStat n={rows?rows.length:"…"} l="Staff totali" Ic={Users} col={C.primary}/>
+        <BigStat n={rows?rows.filter(r=>r.attivo).length:"…"} l="Attivi" Ic={Check} col={C.success}/>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Anagrafica staff</h2>
+        <div style={{display:"flex",alignItems:"center",gap:7,background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 11px"}}>
+          <Search size={15} color={C.mut}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca…" style={{border:"none",outline:"none",fontSize:13,color:C.text,width:120}}/>
+        </div>
+      </div>
+      <div style={{...card,padding:0,overflow:"hidden"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11.5,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.4}}>
+          <span>Nome</span><span>Ruolo</span><span>Zona</span><span>Stato</span>
+        </div>
+        {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
+        : filt.map((r,i)=>(
+          <div key={r.id} style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"12px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13.5}}>
+            <span style={{fontWeight:600}}>{r.nome} {r.cognome}</span>
+            <span style={{color:C.mut}}>{rlabel(r.ruolo)}</span>
+            <span style={{color:C.mut}}>{r.zona||"—"}</span>
+            <span>{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
+          </div>))}
+      </div>
+    </div>
+  );
+}
+
+function AdminEventi({ me }){
+  const [rows,setRows]=useState(null);
+  const [editing,setEditing]=useState(null);
+  async function load(){ const { data }=await supabase.from("eventi").select("*").order("inizio",{ascending:true,nullsFirst:false}); setRows(data||[]); }
+  useEffect(()=>{ load(); },[]);
+  async function del(id){ if(!window.confirm("Eliminare questo evento?")) return; await supabase.from("eventi").delete().eq("id",id); load(); }
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Eventi</h2>
+        <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuovo evento</button>
+      </div>
+      {rows===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : rows.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun evento. Creane uno con "Nuovo evento" — arriverà a tutto lo staff.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
+          {rows.map(e=>{ const cat=CAT[e.categoria]||CAT.NOTTE_EVENTO; return (
+            <div key={e.id} style={{...card,display:"flex",alignItems:"center",gap:10,borderLeft:`4px solid ${cat.color}`}}>
+              <div style={{flex:1,minWidth:0}}>
+                <span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
+                <div style={{...head,fontSize:17,fontWeight:700,margin:"2px 0 3px"}}>{e.titolo}</div>
+                <div style={{fontSize:12.5,color:C.mut}}>{fdate(e.inizio)}{e.luogo?` · ${e.luogo}`:""}{e.zona?` · ${e.zona}`:""}</div>
+              </div>
+              <button onClick={()=>setEditing(e)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={17}/></button>
+              <button onClick={()=>del(e.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
+            </div>); })}
+         </div>}
+      {editing!==null && <EventForm me={me} ev={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+    </div>
+  );
+}
+
+function EventForm({ me, ev, onClose, onSaved }){
+  const isEdit=!!ev.id;
+  const [f,setF]=useState({titolo:ev.titolo||"",categoria:ev.categoria||"NOTTE_EVENTO",inizio:ev.inizio?toLocalInput(ev.inizio):"",luogo:ev.luogo||"",zona:ev.zona||"",descrizione:ev.descrizione||""});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const ok=f.titolo.trim()&&f.categoria;
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const payload={titolo:f.titolo.trim(),categoria:f.categoria,inizio:f.inizio?new Date(f.inizio).toISOString():null,luogo:f.luogo.trim()||null,zona:f.zona.trim()||null,descrizione:f.descrizione.trim()||null};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("eventi").update(payload).eq("id",ev.id)); }
+    else { ({ error }=await supabase.from("eventi").insert({...payload,created_by:me.id})); }
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onSaved();
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica evento":"Nuovo evento"}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <label style={lbl}>Titolo *</label>
+        <input value={f.titolo} onChange={e=>set("titolo",e.target.value)} placeholder="Es. Opening Party" style={inp}/>
+        <label style={lbl}>Categoria *</label>
+        <select value={f.categoria} onChange={e=>set("categoria",e.target.value)} style={inp}>
+          <option value="NOTTE_EVENTO">Notte Evento</option>
+          <option value="PROMOZIONALE">Promozionale</option>
+          <option value="RTS">Road To Summer</option>
+        </select>
+        <label style={lbl}>Data e ora</label>
+        <input type="datetime-local" value={f.inizio} onChange={e=>set("inizio",e.target.value)} style={inp}/>
+        <label style={lbl}>Luogo</label>
+        <input value={f.luogo} onChange={e=>set("luogo",e.target.value)} placeholder="Es. Villa delle Rose, Torino" style={inp}/>
+        <label style={lbl}>Zona (informativa)</label>
+        <input value={f.zona} onChange={e=>set("zona",e.target.value)} placeholder="Es. Piemonte" style={inp}/>
+        <label style={lbl}>Descrizione</label>
+        <textarea value={f.descrizione} onChange={e=>set("descrizione",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+        <p style={{fontSize:12,color:C.mut,margin:"10px 2px 0"}}>L'evento arriva a tutto lo staff Invibe.</p>
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Crea"}</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  );
+}
+
+function toLocalInput(iso){ const d=new Date(iso); const p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
 
 function fdate(s){ if(!s) return "Data da definire"; try{ return new Date(s).toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"short"}); }catch{ return s; } }
 const iconBtn={background:"transparent",border:"none",cursor:"pointer",padding:0};
