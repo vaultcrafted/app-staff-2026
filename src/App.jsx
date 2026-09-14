@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -40,7 +40,7 @@ export default function App(){
   if(!ready) return <Splash/>;
   if(!me) return <Login onDone={async(sess)=>{ await supabase.auth.setSession(sess); await loadMe(); }}/>;
   if(me.ruolo!=="UFFICIO" && !me.profilo_completato) return <Onboarding me={me} onDone={loadMe} onLogout={async()=>{ await supabase.auth.signOut(); setMe(null); }}/>;
-  return <Shell me={me} onLogout={async()=>{ await supabase.auth.signOut(); setMe(null); }}/>;
+  return <Shell me={me} onLogout={async()=>{ await supabase.auth.signOut(); setMe(null); }} reload={loadMe}/>;
 }
 
 function Splash(){
@@ -168,15 +168,15 @@ function Onboarding({ me, onDone, onLogout }){
   );
 }
 
-function Shell({ me, onLogout }){
+function Shell({ me, onLogout, reload }){
   const [admin,setAdmin]=useState(false);
   const isUff=me.ruolo==="UFFICIO";
   if(admin && isUff) return <Admin me={me} onLogout={onLogout} onBack={()=>setAdmin(false)}/>;
-  return <StaffApp me={me} onLogout={onLogout} isUff={isUff} openAdmin={()=>setAdmin(true)}/>;
+  return <StaffApp me={me} onLogout={onLogout} isUff={isUff} openAdmin={()=>setAdmin(true)} reload={reload}/>;
 }
 
 /* =============================== STAFF =============================== */
-function StaffApp({ me, onLogout, isUff, openAdmin }){
+function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const desktop=useMedia("(min-width:860px)");
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
@@ -203,7 +203,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin }){
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
-    : <SProfilo me={me} onLogout={onLogout}/>;
+    : <SProfilo me={me} onLogout={onLogout} reload={reload}/>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       <div style={{background:C.primary,flexShrink:0}}>
@@ -334,20 +334,23 @@ function SAvvisi({ coms, letto, conferma }){
   );
 }
 
-function SProfilo({ me, onLogout }){
+function SProfilo({ me, onLogout, reload }){
+  const [edit,setEdit]=useState(false);
   const pub=[["Ruolo",rlabel(me.ruolo)],["Zona",me.zona||"—"],["Anno d'ingresso",me.anno_ingresso||"—"],["Turni fatti",me.settimane_2025??"—"],["Taglia divisa",me.taglia_maglia||"—"]];
-  const priv=[["Email",me.email||"—"],["Telefono",me.telefono||"—"],["Città",me.citta||"—"],["Codice fiscale",me.codice_fiscale||"—"]];
+  const priv=[["Email",me.email||"—"],["Telefono",me.telefono||"—"],["Città",me.citta||"—"],["Indirizzo",me.indirizzo||"—"],["Codice fiscale",me.codice_fiscale||"—"]];
   const ini=((me.nome||" ")[0]+(me.cognome||" ")[0]).toUpperCase();
   return (
     <div style={{padding:"16px 16px 28px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:18}}>
+      <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:16}}>
         <div style={{width:62,height:62,borderRadius:31,background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",...head,fontSize:22,fontWeight:800,color:C.primary}}>{ini}</div>
         <div><h1 style={{...head,fontSize:23,fontWeight:800,margin:0}}>{me.nome} {me.cognome}</h1>
           <p style={{margin:"2px 0 0",color:C.mut,fontSize:13}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p></div>
       </div>
+      <button onClick={()=>setEdit(true)} style={{...btnPrimary,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={16}/> Modifica profilo</button>
       <h3 style={sect}>Informazioni</h3><Info rows={pub}/>
       <h3 style={{...sect,marginTop:18}}>Dati personali · solo tu e l'ufficio</h3><Info rows={priv}/>
       <button onClick={onLogout} style={{...btnGhost,width:"100%",marginTop:20,color:"#d33",borderColor:"#f0c4c4",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><LogOut size={17}/> Esci</button>
+      {edit && <ProfiloEdit me={me} onClose={()=>setEdit(false)} onSaved={()=>{setEdit(false);reload();}}/>}
     </div>
   );
 }
@@ -418,9 +421,17 @@ function Admin({ me, onLogout, onBack }){
 }
 
 function AdminStaff(){
-  const [rows,setRows]=useState(null); const [q,setQ]=useState("");
-  useEffect(()=>{ supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,attivo").order("cognome").then(({data})=>setRows(data||[])); },[]);
+  const [rows,setRows]=useState(null); const [q,setQ]=useState(""); const [detail,setDetail]=useState(null);
+  async function load(){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,zona,attivo").order("cognome"); setRows(data||[]); }
+  useEffect(()=>{ load(); },[]);
+  async function esporta(){
+    const { data }=await supabase.from("staff_anagrafica").select("nome,cognome,ruolo,username,password_iniziale").order("cognome");
+    const lines=[["Nome","Cognome","Ruolo","Username","Password"]].concat((data||[]).map(r=>[r.nome,r.cognome,r.ruolo,r.username,r.password_iniziale]));
+    const csv=lines.map(r=>r.map(x=>`"${(x==null?"":String(x)).replace(/"/g,String.fromCharCode(34)+String.fromCharCode(34))}"`).join(",")).join(String.fromCharCode(10));
+    downloadCSV("credenziali-staff.csv",csv);
+  }
   const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
+  if(detail) return <StaffDetail id={detail} onBack={()=>{setDetail(null);load();}}/>;
   return (
     <div>
       <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
@@ -432,6 +443,7 @@ function AdminStaff(){
         <div style={{display:"flex",alignItems:"center",gap:7,background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 11px"}}>
           <Search size={15} color={C.mut}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca…" style={{border:"none",outline:"none",fontSize:13,color:C.text,width:120}}/>
         </div>
+        <button onClick={esporta} style={{...btnGhost,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",fontSize:13}}><Download size={15}/> Credenziali</button>
       </div>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11.5,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.4}}>
@@ -439,7 +451,7 @@ function AdminStaff(){
         </div>
         {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
         : filt.map((r,i)=>(
-          <div key={r.id} style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"12px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13.5}}>
+          <div key={r.id} onClick={()=>setDetail(r.id)} style={{display:"grid",gridTemplateColumns:"1.6fr 1.2fr 1fr 0.7fr",padding:"12px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13.5,cursor:"pointer"}}>
             <span style={{fontWeight:600}}>{r.nome} {r.cognome}</span>
             <span style={{color:C.mut}}>{rlabel(r.ruolo)}</span>
             <span style={{color:C.mut}}>{r.zona||"—"}</span>
@@ -628,6 +640,142 @@ function ComForm({ me, com, onClose, onSaved }){
         </div>
         <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
       </div>
+    </div>
+  );
+}
+
+function downloadCSV(filename, text){
+  const blob=new Blob([text],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function ProfiloEdit({ me, onClose, onSaved }){
+  const [f,setF]=useState({nascita:me.nascita||"",sesso:me.sesso||"",citta:me.citta||"",indirizzo:me.indirizzo||"",codice_fiscale:me.codice_fiscale||"",email:me.email||"",telefono:me.telefono||"",instagram:me.instagram||"",professione:me.professione||"",aspirazioni:me.aspirazioni||""});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const cf=(f.codice_fiscale||"").trim().toUpperCase();
+  const emailOk=!f.email.trim()||(f.email.includes("@")&&f.email.includes("."));
+  const cfOk=!cf||cf.length===16;
+  const telOk=!f.telefono.trim()||f.telefono.replace(/[^0-9]/g,"").length>=6;
+  const ok=emailOk&&cfOk&&telOk;
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const { error }=await supabase.from("staff_anagrafica").update({nascita:f.nascita||null,sesso:f.sesso||null,citta:f.citta.trim()||null,indirizzo:f.indirizzo.trim()||null,codice_fiscale:cf||null,email:f.email.trim()||null,telefono:f.telefono.trim()||null,instagram:f.instagram.trim()||null,professione:f.professione.trim()||null,aspirazioni:f.aspirazioni.trim()||null}).eq("id",me.id);
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onSaved();
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Modifica profilo</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <OField label="Data di nascita" type="date" value={f.nascita} onChange={v=>set("nascita",v)} valid={true}/>
+        <OField label="Sesso" value={f.sesso} onChange={v=>set("sesso",v)} valid={true} options={["Uomo","Donna"]}/>
+        <OField label="Città" value={f.citta} onChange={v=>set("citta",v)} valid={true}/>
+        <OField label="Indirizzo di casa" value={f.indirizzo} onChange={v=>set("indirizzo",v)} valid={true}/>
+        <OField label="Codice fiscale" value={f.codice_fiscale} onChange={v=>set("codice_fiscale",v.toUpperCase())} req valid={cfOk} hint="Deve avere 16 caratteri"/>
+        <OField label="Email" type="email" value={f.email} onChange={v=>set("email",v)} req valid={emailOk} hint="Email non valida"/>
+        <OField label="Telefono" value={f.telefono} onChange={v=>set("telefono",v)} req valid={telOk} hint="Numero non valido"/>
+        <OField label="Instagram" value={f.instagram} onChange={v=>set("instagram",v)} valid={true}/>
+        <OField label="Cosa fai nella vita / studi" value={f.professione} onChange={v=>set("professione",v)} valid={true}/>
+        <OField label="Aspirazioni" value={f.aspirazioni} onChange={v=>set("aspirazioni",v)} valid={true}/>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"6px 2px 0"}}>{err}</p>:null}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} Salva</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  );
+}
+
+function StaffDetail({ id, onBack }){
+  const [f,setF]=useState(null);
+  const [note,setNote]=useState({potenziale:"",note:""});
+  const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
+  useEffect(()=>{ (async()=>{
+    const { data:r }=await supabase.from("staff_anagrafica").select("*").eq("id",id).maybeSingle();
+    setF(r||null);
+    const { data:n }=await supabase.from("staff_note_interne").select("potenziale,note").eq("staff_id",id).maybeSingle();
+    if(n) setNote({potenziale:n.potenziale||"",note:n.note||""});
+  })(); },[id]);
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  async function save(){
+    setBusy(true); setMsg("");
+    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","attivo"];
+    const p={}; keys.forEach(k=>{ p[k]=(f[k]===""?null:f[k]); });
+    if(p.anno_ingresso) p.anno_ingresso=parseInt(p.anno_ingresso)||null;
+    const { error:e1 }=await supabase.from("staff_anagrafica").update(p).eq("id",id);
+    const { error:e2 }=await supabase.from("staff_note_interne").upsert({staff_id:id,potenziale:note.potenziale||null,note:note.note||null},{onConflict:"staff_id"});
+    setBusy(false);
+    setMsg((e1||e2) ? ("Errore: "+((e1||e2).message)) : "Salvato ✓");
+    setTimeout(()=>setMsg(""),2500);
+  }
+  if(!f) return <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>;
+  const ruoliOpts=Object.entries(ruoli);
+  return (
+    <div>
+      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"transparent",border:"none",cursor:"pointer",color:C.mut,fontSize:14,padding:"2px 0 10px",fontFamily:"Barlow"}}><ChevronLeft size={18}/> Staff</button>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>{f.nome} {f.cognome}</h2>
+        <button onClick={()=>set("attivo",!f.attivo)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontWeight:700,fontSize:12.5,fontFamily:"Barlow",background:f.attivo?C.successSoft:"#fdecec",color:f.attivo?C.success:"#d33"}}>{f.attivo?"Attivo":"Disattivato"}</button>
+      </div>
+      <div style={{...card,marginBottom:14}}>
+        <h3 style={{...sect,marginTop:0}}>Credenziali</h3>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13.5,marginBottom:6}}><span style={{color:C.mut}}>Username</span><span style={{fontWeight:600}}>{f.username}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:13.5}}><span style={{color:C.mut}}>Password</span><span style={{fontWeight:600}}>{f.password_iniziale}</span></div>
+        <button onClick={()=>navigator.clipboard.writeText(f.username+" / "+f.password_iniziale)} style={{...btnGhost,width:"100%",marginTop:10,fontSize:13}}>Copia credenziali</button>
+      </div>
+      <div style={card}>
+        <h3 style={{...sect,marginTop:0}}>Anagrafica</h3>
+        <OField label="Nome" value={f.nome||""} onChange={v=>set("nome",v)} valid={true}/>
+        <OField label="Cognome" value={f.cognome||""} onChange={v=>set("cognome",v)} valid={true}/>
+        <OField label="Data di nascita" type="date" value={f.nascita||""} onChange={v=>set("nascita",v)} valid={true}/>
+        <OField label="Sesso" value={f.sesso||""} onChange={v=>set("sesso",v)} valid={true} options={["Uomo","Donna"]}/>
+        <OField label="Città" value={f.citta||""} onChange={v=>set("citta",v)} valid={true}/>
+        <OField label="Indirizzo" value={f.indirizzo||""} onChange={v=>set("indirizzo",v)} valid={true}/>
+        <OField label="Codice fiscale" value={f.codice_fiscale||""} onChange={v=>set("codice_fiscale",v.toUpperCase())} valid={true}/>
+        <OField label="Email" value={f.email||""} onChange={v=>set("email",v)} valid={true}/>
+        <OField label="Telefono" value={f.telefono||""} onChange={v=>set("telefono",v)} valid={true}/>
+        <OField label="Instagram" value={f.instagram||""} onChange={v=>set("instagram",v)} valid={true}/>
+      </div>
+      <div style={{...card,marginTop:14}}>
+        <h3 style={{...sect,marginTop:0}}>Ruolo & percorso</h3>
+        <label style={lbl}>Ruolo</label>
+        <select value={f.ruolo||""} onChange={e=>set("ruolo",e.target.value)} style={inp}>
+          <option value="">—</option>
+          {ruoliOpts.map(([k,l])=><option key={k} value={k}>{l}</option>)}
+        </select>
+        <OField label="Zona" value={f.zona||""} onChange={v=>set("zona",v)} valid={true}/>
+        <OField label="Anno d'ingresso" type="number" value={f.anno_ingresso||""} onChange={v=>set("anno_ingresso",v)} valid={true}/>
+        <OField label="Taglia divisa" value={f.taglia_maglia||""} onChange={v=>set("taglia_maglia",v)} valid={true}/>
+        <OField label="Cosa fa nella vita / studi" value={f.professione||""} onChange={v=>set("professione",v)} valid={true}/>
+        <OField label="Aspirazioni" value={f.aspirazioni||""} onChange={v=>set("aspirazioni",v)} valid={true}/>
+        <OField label="Progetti Invibe" value={f.progetti_invibe||""} onChange={v=>set("progetti_invibe",v)} valid={true}/>
+      </div>
+      <div style={{...card,marginTop:14}}>
+        <h3 style={{...sect,marginTop:0}}>Certificati</h3>
+        <OField label="Antincendio" value={f.att_antincendio||""} onChange={v=>set("att_antincendio",v)} valid={true} placeholder="Es. sì / data"/>
+        <OField label="Primo soccorso" value={f.att_primo_soccorso||""} onChange={v=>set("att_primo_soccorso",v)} valid={true} placeholder="Es. sì / data"/>
+        <OField label="BLSD" value={f.att_blsd||""} onChange={v=>set("att_blsd",v)} valid={true}/>
+        <OField label="Libretto assicurativo" value={f.att_libretto||""} onChange={v=>set("att_libretto",v)} valid={true}/>
+      </div>
+      <div style={{...card,marginTop:14,borderLeft:`4px solid ${C.accent}`}}>
+        <h3 style={{...sect,marginTop:0}}>Note interne · solo ufficio</h3>
+        <label style={lbl}>Potenziale / crescita</label>
+        <input value={note.potenziale} onChange={e=>setNote(n=>({...n,potenziale:e.target.value}))} placeholder="Es. ARM, AACM, ACA…" style={inp}/>
+        <label style={lbl}>Note</label>
+        <textarea value={note.note} onChange={e=>setNote(n=>({...n,note:e.target.value}))} rows={3} style={{...inp,resize:"vertical"}}/>
+      </div>
+      {msg?<p style={{fontSize:13,fontWeight:600,color:msg.startsWith("Errore")?"#d33":C.success,margin:"12px 2px 0"}}>{msg}</p>:null}
+      <button onClick={save} disabled={busy} style={{...btnPrimary,width:"100%",marginTop:14,padding:"13px 0",fontSize:15,opacity:busy?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{busy&&<Loader2 size={17} className="spin"/>} Salva modifiche</button>
+      <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
