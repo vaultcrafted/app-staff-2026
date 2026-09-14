@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -429,11 +429,12 @@ function EventDetail({ ev, part, onA, onBack, me }){
 function Admin({ me, onLogout, onBack }){
   const desktop=useMedia("(min-width:860px)");
   const [section,setSection]=useState("staff");
-  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"]];
+  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["economia",Wallet,"Economia"]];
   const body = section==="staff" ? <AdminStaff/>
     : section==="eventi" ? <AdminEventi me={me}/>
     : section==="avvisi" ? <AdminComunicazioni me={me}/>
     : section==="premi" ? <AdminPremi/>
+    : section==="economia" ? <AdminEconomia/>
     : <div style={{...card,color:C.mut,fontSize:14}}>Presenze — si gestiscono dentro ogni evento (Eventi › Gestisci presenze).</div>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
@@ -1060,6 +1061,110 @@ function PremioForm({ premio, onClose, onSaved }){
         <div style={{display:"flex",gap:8,marginTop:14}}>
           <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
           <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Crea"}</button>
+        </div>
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  );
+}
+
+function AdminEconomia(){
+  const [rows,setRows]=useState(null); const [eventi,setEventi]=useState([]); const [editing,setEditing]=useState(null); const [filter,setFilter]=useState("tutti");
+  async function load(){
+    const { data }=await supabase.from("economia").select("*").order("created_at",{ascending:false}); setRows(data||[]);
+    const { data:ev }=await supabase.from("eventi").select("id,titolo").order("inizio",{ascending:false}); setEventi(ev||[]);
+  }
+  useEffect(()=>{ load(); },[]);
+  async function del(id){ if(!window.confirm("Eliminare questa voce?")) return; await supabase.from("economia").delete().eq("id",id); load(); }
+  async function toggleSaldato(r){ await supabase.from("economia").update({saldato:!r.saldato}).eq("id",r.id); load(); }
+  const evName=id=>{ const e=eventi.find(x=>x.id===id); return e?e.titolo:null; };
+  const eur=n=>"€ "+Number(n||0).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const all=rows||[];
+  const entrate=all.filter(r=>r.tipo==="entrata").reduce((a,r)=>a+Number(r.importo||0),0);
+  const uscite=all.filter(r=>r.tipo==="uscita").reduce((a,r)=>a+Number(r.importo||0),0);
+  const daIncassare=all.filter(r=>r.chi_deve && !r.saldato).reduce((a,r)=>a+Number(r.importo||0),0);
+  const list=all.filter(r=> filter==="dasaldare"?(r.chi_deve && !r.saldato) : filter==="entrate"?r.tipo==="entrata" : filter==="uscite"?r.tipo==="uscita" : true);
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
+        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Economia</h2>
+        <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuova voce</button>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+        <BigStat n={eur(entrate)} l="Entrate" Ic={Wallet} col={C.success}/>
+        <BigStat n={eur(uscite)} l="Uscite" Ic={Wallet} col={"#d33"}/>
+        <BigStat n={eur(entrate-uscite)} l="Saldo" Ic={Wallet} col={C.primary}/>
+        <BigStat n={eur(daIncassare)} l="Da incassare" Ic={Wallet} col={C.amber}/>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+        {[["tutti","Tutte"],["entrate","Entrate"],["uscite","Uscite"],["dasaldare","Da saldare"]].map(([k,l])=>{ const on=filter===k; return <button key={k} onClick={()=>setFilter(k)} style={{border:`1px solid ${on?C.primary:C.border}`,background:on?C.primarySoft:C.surface,color:on?C.primary:C.mut,borderRadius:999,padding:"6px 12px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:"Barlow"}}>{l}</button>; })}
+      </div>
+      {rows===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : list.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessuna voce. Aggiungine una.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {list.map(r=>(
+            <div key={r.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderLeft:`4px solid ${r.tipo==="entrata"?C.success:"#d33"}`}}>
+              <div style={{flex:1,minWidth:160}}>
+                <div style={{fontWeight:700,fontSize:15}}>{r.voce}</div>
+                <div style={{fontSize:12,color:C.mut,marginTop:2}}>
+                  {r.tipo==="entrata"?"Entrata":"Uscita"}{evName(r.evento_id)?` · ${evName(r.evento_id)}`:""}{r.chi_deve?` · Deve dare: ${r.chi_deve}`:""}
+                </div>
+                {r.note && <div style={{fontSize:12,color:C.mut,marginTop:2}}>{r.note}</div>}
+              </div>
+              <div style={{...head,fontWeight:800,fontSize:16,color:r.tipo==="entrata"?C.success:"#d33"}}>{r.tipo==="entrata"?"+":"−"}{eur(r.importo)}</div>
+              {r.chi_deve && <button onClick={()=>toggleSaldato(r)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"6px 11px",fontFamily:"Barlow",fontWeight:700,fontSize:12,background:r.saldato?C.successSoft:C.amberSoft,color:r.saldato?C.success:C.amber}}>{r.saldato?"Saldato":"Da saldare"}</button>}
+              <button onClick={()=>setEditing(r)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={16}/></button>
+              <button onClick={()=>del(r.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={16}/></button>
+            </div>))}
+         </div>}
+      {editing!==null && <EconForm voce={editing} eventi={eventi} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+    </div>
+  );
+}
+
+function EconForm({ voce, eventi, onClose, onSaved }){
+  const isEdit=!!voce.id;
+  const [f,setF]=useState({voce:voce.voce||"",tipo:voce.tipo||"uscita",importo:(voce.importo!=null?voce.importo:""),evento_id:voce.evento_id||"",chi_deve:voce.chi_deve||"",note:voce.note||"",saldato:!!voce.saldato});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  const ok=f.voce.trim();
+  async function save(){
+    if(!ok||busy) return; setBusy(true); setErr("");
+    const payload={voce:f.voce.trim(),tipo:f.tipo,importo:(f.importo===""||f.importo==null)?0:Number(f.importo)||0,evento_id:f.evento_id||null,chi_deve:f.chi_deve.trim()||null,note:f.note.trim()||null,saldato:f.saldato};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("economia").update(payload).eq("id",voce.id)); }
+    else { ({ error }=await supabase.from("economia").insert(payload)); }
+    setBusy(false);
+    if(error){ setErr(error.message); return; }
+    onSaved();
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica voce":"Nuova voce"}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
+        </div>
+        <label style={lbl}>Voce *</label>
+        <input value={f.voce} onChange={e=>set("voce",e.target.value)} placeholder="Es. Sponsor serata / Rimborso benzina" style={inp}/>
+        <label style={lbl}>Tipo</label>
+        <select value={f.tipo} onChange={e=>set("tipo",e.target.value)} style={inp}><option value="entrata">Entrata</option><option value="uscita">Uscita</option></select>
+        <label style={lbl}>Importo (€)</label>
+        <input type="number" step="0.01" value={f.importo} onChange={e=>set("importo",e.target.value)} style={inp}/>
+        <label style={lbl}>Evento collegato (facoltativo)</label>
+        <select value={f.evento_id} onChange={e=>set("evento_id",e.target.value)} style={inp}><option value="">—</option>{eventi.map(e=><option key={e.id} value={e.id}>{e.titolo}</option>)}</select>
+        <label style={lbl}>Chi deve dare i soldi (facoltativo)</label>
+        <input value={f.chi_deve} onChange={e=>set("chi_deve",e.target.value)} placeholder="Nome / locale / sponsor" style={inp}/>
+        <label style={lbl}>Note</label>
+        <textarea value={f.note} onChange={e=>set("note",e.target.value)} rows={2} style={{...inp,resize:"vertical"}}/>
+        <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
+          <input type="checkbox" checked={f.saldato} onChange={e=>set("saldato",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
+          <span style={{fontSize:13.5,color:C.text}}>Già saldato / incassato</span>
+        </label>
+        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+        <div style={{display:"flex",gap:8,marginTop:14}}>
+          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
+          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Aggiungi"}</button>
         </div>
         <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
       </div>
