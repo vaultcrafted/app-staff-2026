@@ -280,7 +280,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
               <Bell size={17} color={C.amber} style={{flexShrink:0,marginTop:1}}/>
               <div style={{flex:1}}>
                 <p style={{margin:0,fontWeight:700,fontSize:14}}>{bc.titolo}</p>
-                {bc.corpo && <p style={{margin:"2px 0 0",fontSize:12.5,color:C.mut}}>{bc.corpo}</p>}
+                {bc.corpo && <p style={{margin:"2px 0 0",fontSize:12.5,color:C.mut,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{bc.corpo}</p>}
               </div>
             </div>
             <button onClick={()=>conferma(bc.id)} style={{...btnPrimary,width:"100%",marginTop:11,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>
@@ -350,25 +350,44 @@ function SEventi({ events, rsvp, open }){
 }
 
 function SAvvisi({ coms, letto, conferma }){
+  const [open,setOpen]=useState(null);
   return (
     <div style={{padding:"16px 16px 24px"}}>
       <h1 style={{...head,fontSize:26,fontWeight:800,margin:"4px 0 3px"}}>Avvisi</h1>
-      <p style={{margin:"0 0 18px",color:C.mut,fontSize:13}}>Comunicazioni dall'ufficio.</p>
+      <p style={{margin:"0 0 18px",color:C.mut,fontSize:13}}>Comunicazioni dall'ufficio. Tocca per aprire.</p>
       {coms.length===0 ? <div style={{...card,color:C.mut,fontSize:13}}>Nessun avviso.</div>
       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
           {coms.map(c=>{ const confermato=!!letto[c.id]; return (
-            <div key={c.id} style={card}>
+            <button key={c.id} onClick={()=>setOpen(c)} style={{...card,textAlign:"left",cursor:"pointer",width:"100%",display:"block"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5,gap:8}}>
                 <span style={{fontWeight:700,fontSize:14.5}}>{c.titolo}</span>
                 {c.richiede_conferma && (confermato
                   ? <span style={{fontSize:10.5,fontWeight:700,color:C.success,background:C.successSoft,borderRadius:6,padding:"3px 7px",whiteSpace:"nowrap"}}>CONFERMATO</span>
                   : <span style={{fontSize:10.5,fontWeight:700,color:C.amber,background:C.amberSoft,borderRadius:6,padding:"3px 7px",whiteSpace:"nowrap"}}>DA CONFERMARE</span>)}
               </div>
-              {c.corpo && <p style={{margin:"0 0 7px",fontSize:13,color:C.mut,lineHeight:1.45}}>{c.corpo}</p>}
+              {c.corpo && <p style={{margin:"0 0 7px",fontSize:13,color:C.mut,lineHeight:1.45,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{c.corpo}</p>}
               <span style={{fontSize:11.5,color:C.mut}}>{fdate(c.created_at)}</span>
-              {c.richiede_conferma && !confermato && <button onClick={()=>conferma(c.id)} style={{...btnPrimary,marginTop:10,padding:"9px 16px"}}>Conferma</button>}
-            </div>); })}
+            </button>); })}
         </div>}
+      {open && <AvvisoModal c={open} confermato={!!letto[open.id]} onConferma={()=>conferma(open.id)} onClose={()=>setOpen(null)}/>}
+    </div>
+  );
+}
+
+function AvvisoModal({ c, confermato, onConferma, onClose }){
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:520,margin:"24px 0",padding:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
+          <h3 style={{...head,fontSize:22,fontWeight:800,margin:0}}>{c.titolo}</h3>
+          <button onClick={onClose} style={iconBtn}><X size={22} color={C.mut}/></button>
+        </div>
+        <span style={{fontSize:12,color:C.mut}}>{fdate(c.created_at)}</span>
+        {c.corpo && <p style={{margin:"14px 0 0",fontSize:14.5,color:C.text,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{c.corpo}</p>}
+        {c.richiede_conferma && (confermato
+          ? <div style={{marginTop:18,display:"inline-flex",alignItems:"center",gap:6,color:C.success,fontSize:13.5,fontWeight:700}}><Check size={16}/> Confermato</div>
+          : <button onClick={()=>{ onConferma(); onClose(); }} style={{...btnPrimary,width:"100%",marginTop:18,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>)}
+      </div>
     </div>
   );
 }
