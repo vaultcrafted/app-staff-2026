@@ -422,6 +422,8 @@ function Admin({ me, onLogout, onBack }){
 
 function AdminStaff(){
   const [rows,setRows]=useState(null); const [q,setQ]=useState(""); const [detail,setDetail]=useState(null);
+  const [fRuolo,setFRuolo]=useState(""); const [fStato,setFStato]=useState("tutti"); const [fSesso,setFSesso]=useState("tutti");
+  const [sortKey,setSortKey]=useState(0); const [sortDir,setSortDir]=useState("asc");
   async function load(){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,sesso,nascita,citta,indirizzo,email,telefono,codice_fiscale,instagram,anno_ingresso,settimane_2024,settimane_2025,settimane_2026,taglia_maglia,professione,attivo").order("cognome"); setRows(data||[]); }
   useEffect(()=>{ load(); },[]);
   async function esporta(){
@@ -430,53 +432,80 @@ function AdminStaff(){
     const csv=lines.map(r=>r.map(x=>`"${(x==null?"":String(x)).replace(/"/g,String.fromCharCode(34)+String.fromCharCode(34))}"`).join(",")).join(String.fromCharCode(10));
     downloadCSV("credenziali-staff.csv",csv);
   }
-  const filt=(rows||[]).filter(r=>(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase()));
   if(detail) return <StaffDetail id={detail} onBack={()=>{setDetail(null);load();}}/>;
   const dt=v=>v?new Date(v).toLocaleDateString("it-IT"):"—";
   const COLS=[
-    ["Nome",r=>`${r.nome} ${r.cognome}`,"180px"],
-    ["Ruolo",r=>rlabel(r.ruolo),"130px"],
-    ["Sesso",r=>r.sesso||"—","80px"],
-    ["Nascita",r=>dt(r.nascita),"100px"],
-    ["Città",r=>r.citta||"—","120px"],
-    ["Indirizzo",r=>r.indirizzo||"—","190px"],
-    ["Email",r=>r.email||"—","210px"],
-    ["Telefono",r=>r.telefono||"—","130px"],
-    ["Cod. fiscale",r=>r.codice_fiscale||"—","150px"],
-    ["Instagram",r=>r.instagram||"—","130px"],
-    ["Anno",r=>r.anno_ingresso||"—","60px"],
-    ["S.24",r=>r.settimane_2024??"—","56px"],
-    ["S.25",r=>r.settimane_2025??"—","56px"],
-    ["S.26",r=>r.settimane_2026??"—","56px"],
-    ["Taglia",r=>r.taglia_maglia||"—","70px"],
-    ["Cosa fa",r=>r.professione||"—","170px"],
-    ["Stato",null,"92px"],
+    ["Nome",r=>`${r.nome} ${r.cognome}`,"180px",r=>`${r.cognome} ${r.nome}`.toLowerCase()],
+    ["Ruolo",r=>rlabel(r.ruolo),"130px",r=>rlabel(r.ruolo)],
+    ["Sesso",r=>r.sesso||"—","80px",r=>r.sesso],
+    ["Nascita",r=>dt(r.nascita),"100px",r=>r.nascita],
+    ["Città",r=>r.citta||"—","120px",r=>r.citta],
+    ["Indirizzo",r=>r.indirizzo||"—","190px",r=>r.indirizzo],
+    ["Email",r=>r.email||"—","210px",r=>r.email],
+    ["Telefono",r=>r.telefono||"—","130px",r=>r.telefono],
+    ["Cod. fiscale",r=>r.codice_fiscale||"—","150px",r=>r.codice_fiscale],
+    ["Instagram",r=>r.instagram||"—","130px",r=>r.instagram],
+    ["Anno",r=>r.anno_ingresso||"—","60px",r=>r.anno_ingresso],
+    ["S.24",r=>r.settimane_2024??"—","56px",r=>r.settimane_2024],
+    ["S.25",r=>r.settimane_2025??"—","56px",r=>r.settimane_2025],
+    ["S.26",r=>r.settimane_2026??"—","56px",r=>r.settimane_2026],
+    ["Taglia",r=>r.taglia_maglia||"—","70px",r=>r.taglia_maglia],
+    ["Cosa fa",r=>r.professione||"—","170px",r=>r.professione],
+    ["Stato",null,"92px",r=>r.attivo?1:0],
   ];
   const grid=COLS.map(c=>c[2]).join(" ");
   const cell={overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:C.mut};
+  const fsel={border:`1px solid ${C.border}`,borderRadius:9,padding:"7px 10px",fontSize:13,color:C.text,background:C.surface,fontFamily:"Barlow"};
+  let list=(rows||[]).filter(r=>{
+    if(q && !(`${r.nome} ${r.cognome}`).toLowerCase().includes(q.toLowerCase())) return false;
+    if(fRuolo && r.ruolo!==fRuolo) return false;
+    if(fStato==="attivi" && !r.attivo) return false;
+    if(fStato==="inattivi" && r.attivo) return false;
+    if(fSesso==="donna" && !isDonna(r.sesso)) return false;
+    if(fSesso==="uomo" && (isDonna(r.sesso)|| !r.sesso)) return false;
+    return true;
+  });
+  const sv=COLS[sortKey][3];
+  list=[...list].sort((a,b)=>{ const x=sv(a),y=sv(b); if(x==null&&y==null)return 0; if(x==null)return 1; if(y==null)return -1; if(typeof x==="number"&&typeof y==="number")return x-y; return String(x).localeCompare(String(y),"it"); });
+  if(sortDir==="desc") list.reverse();
+  const clickSort=ci=>{ if(sortKey===ci) setSortDir(d=>d==="asc"?"desc":"asc"); else { setSortKey(ci); setSortDir("asc"); } };
   return (
     <div>
       <div style={{display:"flex",gap:12,marginBottom:18,flexWrap:"wrap"}}>
         <BigStat n={rows?rows.length:"…"} l="Staff totali" Ic={Users} col={C.primary}/>
         <BigStat n={rows?rows.filter(r=>r.attivo).length:"…"} l="Attivi" Ic={Check} col={C.success}/>
       </div>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
         <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Anagrafica staff</h2>
         <div style={{display:"flex",alignItems:"center",gap:7,background:C.surface,border:`1px solid ${C.border}`,borderRadius:10,padding:"8px 11px"}}>
           <Search size={15} color={C.mut}/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Cerca…" style={{border:"none",outline:"none",fontSize:13,color:C.text,width:120}}/>
         </div>
         <button onClick={esporta} style={{...btnGhost,display:"flex",alignItems:"center",gap:6,padding:"8px 12px",fontSize:13}}><Download size={15}/> Credenziali</button>
       </div>
-      <p style={{fontSize:12,color:C.mut,margin:"0 0 8px"}}>Scorri in orizzontale per vedere tutti i campi · tocca una riga per la scheda completa. (S.24/25/26 = turni per anno)</p>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+        <select value={fRuolo} onChange={e=>setFRuolo(e.target.value)} style={fsel}>
+          <option value="">Tutti i ruoli</option>
+          {Object.entries(ruoli).map(([k,l])=><option key={k} value={k}>{l}</option>)}
+        </select>
+        <select value={fStato} onChange={e=>setFStato(e.target.value)} style={fsel}>
+          <option value="tutti">Tutti gli stati</option><option value="attivi">Solo attivi</option><option value="inattivi">Solo inattivi</option>
+        </select>
+        <select value={fSesso} onChange={e=>setFSesso(e.target.value)} style={fsel}>
+          <option value="tutti">Uomo e Donna</option><option value="uomo">Solo uomini</option><option value="donna">Solo donne</option>
+        </select>
+        {(fRuolo||fStato!=="tutti"||fSesso!=="tutti") && <button onClick={()=>{setFRuolo("");setFStato("tutti");setFSesso("tutti");}} style={{...fsel,cursor:"pointer",color:C.primary,fontWeight:700}}>Azzera filtri</button>}
+        <span style={{alignSelf:"center",fontSize:12.5,color:C.mut}}>{list.length} risultati</span>
+      </div>
+      <p style={{fontSize:12,color:C.mut,margin:"0 0 8px"}}>Scorri in orizzontale · clic sull'intestazione per riordinare · tocca una riga per la scheda. (S.24/25/26 = turni per anno)</p>
       <div style={{...card,padding:0,overflow:"hidden"}}>
         <div style={{overflowX:"auto"}}>
           <div style={{minWidth:2000}}>
             <div style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",background:"#fbfcfe",borderBottom:`1px solid ${C.border}`,fontSize:11,fontWeight:700,color:C.mut,textTransform:"uppercase",letterSpacing:.3}}>
-              {COLS.map(c=><span key={c[0]} style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c[0]}</span>)}
+              {COLS.map((c,ci)=><span key={c[0]} onClick={()=>clickSort(ci)} style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",color:sortKey===ci?C.primary:C.mut}}>{c[0]}{sortKey===ci?(sortDir==="asc"?" ▲":" ▼"):""}</span>)}
             </div>
             {rows===null ? <div style={{padding:20,color:C.mut,fontSize:13}}>Carico…</div>
-            : filt.map((r,i)=>(
-              <div key={r.id} onClick={()=>setDetail(r.id)} style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",borderBottom:i<filt.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13,cursor:"pointer"}}>
+            : list.map((r,i)=>(
+              <div key={r.id} onClick={()=>setDetail(r.id)} style={{display:"grid",gridTemplateColumns:grid,gap:10,padding:"11px 16px",borderBottom:i<list.length-1?`1px solid ${C.border}`:"none",alignItems:"center",fontSize:13,cursor:"pointer"}}>
                 {COLS.map((c,ci)=> c[0]==="Stato"
                   ? <span key="stato">{r.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}</span>
                   : <span key={c[0]} style={ci===0?{fontWeight:600,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}:cell}>{c[1](r)}</span>)}
