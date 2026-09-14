@@ -254,7 +254,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
 
 function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica }){
   const upcoming=events.slice(0,6);
-  const bannerCom=(coms||[]).find(c=>c.richiede_conferma && !letto[c.id]);
+  const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
   const cl=classifica||[];
   const myIdx=cl.findIndex(x=>x.staff_id===me.id);
   const myPunti=myIdx>=0?cl[myIdx].punti:0;
@@ -273,18 +273,19 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         </div>
       </div>
 
-      {bannerCom && (
-        <div style={{background:C.amberSoft,border:"1px solid #f4d9a6",borderRadius:16,padding:14,marginBottom:18}}>
-          <div style={{display:"flex",gap:9}}>
-            <Bell size={17} color={C.amber} style={{flexShrink:0,marginTop:1}}/>
-            <div style={{flex:1}}>
-              <p style={{margin:0,fontWeight:700,fontSize:14}}>{bannerCom.titolo}</p>
-              {bannerCom.corpo && <p style={{margin:"2px 0 0",fontSize:12.5,color:C.mut}}>{bannerCom.corpo}</p>}
+      {bannerComs.length>0 && <div style={{marginBottom:18,display:"flex",flexDirection:"column",gap:10}}>
+        {bannerComs.map(bc=>(
+          <div key={bc.id} style={{background:C.amberSoft,border:"1px solid #f4d9a6",borderRadius:16,padding:14}}>
+            <div style={{display:"flex",gap:9}}>
+              <Bell size={17} color={C.amber} style={{flexShrink:0,marginTop:1}}/>
+              <div style={{flex:1}}>
+                <p style={{margin:0,fontWeight:700,fontSize:14}}>{bc.titolo}</p>
+                {bc.corpo && <p style={{margin:"2px 0 0",fontSize:12.5,color:C.mut}}>{bc.corpo}</p>}
+              </div>
             </div>
-          </div>
-          <button onClick={()=>conferma(bannerCom.id)} style={{...btnPrimary,width:"100%",marginTop:11,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>
-        </div>
-      )}
+            <button onClick={()=>conferma(bc.id)} style={{...btnPrimary,width:"100%",marginTop:11,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>
+          </div>))}
+      </div>}
       {isUff && <button onClick={openAdmin} style={{...btnPrimary,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"12px 0"}}>
         <Shield size={17}/> Pannello Admin</button>}
 
