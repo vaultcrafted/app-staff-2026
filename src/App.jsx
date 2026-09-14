@@ -219,8 +219,9 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
   const ev=events.find(e=>e.id===openEvent);
   const myPunti=(classifica.find(x=>x.staff_id===me.id)||{}).punti||0;
-  const [notifOpen,setNotifOpen]=useState(false); const [avvisoOpen,setAvvisoOpen]=useState(null);
+  const [notifOpen,setNotifOpen]=useState(false); const [notifClosing,setNotifClosing]=useState(false); const [avvisoOpen,setAvvisoOpen]=useState(null);
   const unread=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]).length;
+  const closeNotif=()=>{ setNotifClosing(true); setTimeout(()=>{ setNotifOpen(false); setNotifClosing(false); },170); };
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica}/>
@@ -251,8 +252,8 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
         {NAV.map(([k,Ic,l])=>{ const on=tab===k; return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}><Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>; })}
       </nav>}
       {notifOpen && (
-        <div onClick={()=>setNotifOpen(false)} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(0,0,0,0.15)"}}>
-          <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:58,right:12,left:12,maxWidth:400,marginLeft:"auto",background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 20px 50px rgba(20,40,80,0.22)",maxHeight:"72vh",overflowY:"auto"}}>
+        <div onClick={closeNotif} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(0,0,0,0.15)",animation:(notifClosing?"bgOut":"bgIn")+" .17s ease forwards"}}>
+          <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:58,right:12,left:12,maxWidth:400,marginLeft:"auto",background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 20px 50px rgba(20,40,80,0.22)",maxHeight:"72vh",overflowY:"auto",transformOrigin:"top right",animation:(notifClosing?"notifOut":"notifIn")+" .18s ease forwards"}}>
             <div style={{padding:"13px 16px",fontFamily:"'Barlow Condensed', sans-serif",fontWeight:800,fontSize:17}}>Notifiche</div>
             {(()=>{ const uncon=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]); const up=(events||[]).slice(0,5); const otherC=(coms||[]).filter(c=>!(c.richiede_conferma && !letto[c.id])).slice(0,6);
               if(uncon.length===0 && up.length===0 && otherC.length===0) return <div style={{padding:"6px 16px 18px",color:C.mut,fontSize:13}}>Nessuna notifica.</div>;
