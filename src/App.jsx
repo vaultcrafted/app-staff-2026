@@ -1294,6 +1294,7 @@ function AdminPremi(){
   useEffect(()=>{ load(); },[]);
   async function del(id){ if(!window.confirm("Eliminare questo premio?")) return; await supabase.from("premi").delete().eq("id",id); load(); }
   async function consegna(id){ await supabase.from("riscatti").update({stato:"consegnato"}).eq("id",id); load(); }
+  async function annullaRiscatto(id){ if(!window.confirm("Annullare questo riscatto? I punti torneranno disponibili allo staff.")) return; await supabase.from("riscatti").delete().eq("id",id); load(); }
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
@@ -1329,6 +1330,7 @@ function AdminPremi(){
               {r.stato==="consegnato"
                 ? <Tag c={C.success} bg={C.successSoft} t="Consegnato"/>
                 : <button onClick={()=>consegna(r.id)} style={{...btnPrimary,padding:"7px 12px",fontSize:12.5}}>Segna consegnato</button>}
+              <button onClick={()=>annullaRiscatto(r.id)} title="Annulla riscatto" style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={16}/></button>
             </div>))}
          </div>}
       {editing!==null && <PremioForm premio={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
