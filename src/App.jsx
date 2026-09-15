@@ -258,7 +258,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
         {NAV.map(([k,Ic,l])=>{ const on=tab===k; return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}><Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>; })}
       </nav>}
       {notifOpen && (
-        <div onClick={closeNotif} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(0,0,0,0.15)",animation:notifClosing?"bgOut .2s ease forwards":"bgIn .3s ease forwards"}}>
+        <div onMouseDown={e=>{ if(e.target===e.currentTarget) closeNotif(); }} style={{position:"fixed",inset:0,zIndex:90,background:"rgba(0,0,0,0.15)",animation:notifClosing?"bgOut .2s ease forwards":"bgIn .3s ease forwards"}}>
           <div onClick={e=>e.stopPropagation()} style={{position:"absolute",top:58,right:12,left:12,maxWidth:400,marginLeft:"auto",background:C.surface,borderRadius:16,border:`1px solid ${C.border}`,boxShadow:"0 20px 50px rgba(20,40,80,0.22)",maxHeight:"72vh",overflowY:"auto",transformOrigin:"top right",animation:notifClosing?"notifOut .2s cubic-bezier(.4,0,1,1) forwards":"notifIn .42s cubic-bezier(.16,1,.3,1) forwards"}}>
             <div style={{padding:"13px 16px",fontFamily:"'Barlow Condensed', sans-serif",fontWeight:800,fontSize:17}}>Notifiche</div>
             {(()=>{ const uncon=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]); const up=(events||[]).slice(0,5); const otherC=(coms||[]).filter(c=>!(c.richiede_conferma && !letto[c.id])).slice(0,6);
@@ -387,7 +387,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         <VitaStaff items={vita}/>
       </>}
       {clAll && (
-        <div onClick={()=>setClAll(false)} style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}}>
+        <div onMouseDown={e=>{ if(e.target===e.currentTarget) setClAll(false); }} style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}}>
           <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
               <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Classifica completa</h3>
@@ -449,7 +449,7 @@ function SAvvisi({ coms, letto, conferma }){
 
 function AvvisoModal({ c, confermato, onConferma, onClose }){
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:520,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
           <h3 style={{...head,fontSize:22,fontWeight:800,margin:0}}>{c.titolo}</h3>
@@ -807,7 +807,7 @@ function ValutaStaff({ ev, staff, existing, onClose, onSaved }){
   const [voto,setVoto]=useState(existing.voto||0); const [commento,setCommento]=useState(existing.commento||""); const [busy,setBusy]=useState(false);
   async function save(){ setBusy(true); await supabase.from("valutazioni").upsert({evento_id:ev.id,staff_id:staff.id,tipo:"uff_su_staff",voto:voto||null,commento:commento.trim()||null},{onConflict:"evento_id,staff_id,tipo"}); setBusy(false); onSaved(); }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:420,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
           <h3 style={{...head,fontSize:19,fontWeight:800,margin:0}}>Valuta {staff.nome} {staff.cognome}</h3>
@@ -952,7 +952,7 @@ function VitaForm({ item, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica tessera":"Nuova tessera"}</h3>
@@ -1002,7 +1002,7 @@ function NovitaForm({ nov, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica novità":"Nuova novità"}</h3>
@@ -1047,7 +1047,7 @@ function ComForm({ me, com, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica comunicazione":"Nuova comunicazione"}</h3>
@@ -1097,7 +1097,7 @@ function ProfiloEdit({ me, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Modifica profilo</h3>
@@ -1353,7 +1353,7 @@ function PremioForm({ premio, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica premio":"Nuovo premio"}</h3>
@@ -1451,7 +1451,7 @@ function EconForm({ voce, eventi, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica voce":"Nuova voce"}</h3>
@@ -1552,7 +1552,7 @@ function PasswordEdit({ me, onClose }){
     setBusy(false); setMsg("Password aggiornata"); setTimeout(onClose,1200);
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:420,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Cambia password</h3>
@@ -1648,7 +1648,7 @@ function EventForm({ me, ev, onClose, onSaved }){
     onSaved();
   }
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
           <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica evento":"Nuovo evento"}</h3>
@@ -1750,7 +1750,7 @@ function VitaStaff({ items }){
 function VitaModal({ item, onClose }){
   const Ic=ICONS[item.icona]||Sparkles;
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:22}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
           <div style={{width:48,height:48,borderRadius:13,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={24} color={C.accent}/></div>
