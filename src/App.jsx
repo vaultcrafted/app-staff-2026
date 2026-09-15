@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap, BarChart3
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap, BarChart3, Lock
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -1243,39 +1243,53 @@ function StaffDetail({ id, onBack }){
 function SPremi({ me, myPunti, riscatti, reloadRiscatti }){
   const [premi,setPremi]=useState(null);
   useEffect(()=>{ supabase.from("premi").select("*").eq("attivo",true).order("costo_punti").then(({data})=>setPremi(data||[])); },[]);
-  const spent=(riscatti||[]).filter(r=>r.stato!=="annullato").reduce((a,r)=>a+(r.punti_spesi||0),0);
-  const avail=(Number(myPunti)||0)-spent;
+  const P=Number(myPunti)||0;
   async function riscatta(p){
-    if(avail<p.costo_punti) return;
-    if(!window.confirm(`Riscattare "${p.nome}" per ${p.costo_punti} punti?`)) return;
-    await supabase.from("riscatti").insert({staff_id:me.id,premio_id:p.id,premio_nome:p.nome,punti_spesi:p.costo_punti,stato:"richiesto"});
+    if(P<p.costo_punti) return;
+    if((riscatti||[]).some(r=>r.premio_id===p.id)) return;
+    if(!window.confirm(`Riscattare "${p.nome}"? L'ufficio ti dirà come ritirarlo.`)) return;
+    await supabase.from("riscatti").insert({staff_id:me.id,premio_id:p.id,premio_nome:p.nome,punti_spesi:0,stato:"richiesto"});
     reloadRiscatti();
   }
   return (
     <div style={{padding:"16px 16px 24px"}}>
       <h1 style={{...head,fontSize:26,fontWeight:800,margin:"4px 0 12px"}}>Premi</h1>
-      <div style={{...card,display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
+      <div style={{...card,display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
         <div style={{width:44,height:44,borderRadius:12,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trophy size={20} color={C.accent}/></div>
-        <div><div style={{...head,fontSize:24,fontWeight:800,color:C.accent,lineHeight:1}}>{avail}</div><div style={{fontSize:12,color:C.mut,marginTop:2}}>punti disponibili</div></div>
+        <div><div style={{...head,fontSize:24,fontWeight:800,color:C.accent,lineHeight:1}}>{P}</div><div style={{fontSize:12,color:C.mut,marginTop:2}}>punti totali · più ne accumuli, più premi sblocchi</div></div>
       </div>
       {premi===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
-       : premi.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun premio disponibile al momento.</div>
-       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          {premi.map(p=>{ const canBuy=avail>=p.costo_punti; return (
-            <div key={p.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-              <div style={{flex:1,minWidth:150}}>
-                <div style={{...head,fontSize:17,fontWeight:700}}>{p.nome}</div>
-                {p.descrizione && <div style={{fontSize:12.5,color:C.mut,marginTop:2}}>{p.descrizione}</div>}
-                <div style={{fontSize:12.5,color:C.accent,fontWeight:700,marginTop:4}}>{p.costo_punti} punti</div>
+       : premi.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun premio al momento.</div>
+       : <div>
+          {premi.map((p,i)=>{ const unlocked=P>=p.costo_punti; const ric=(riscatti||[]).find(r=>r.premio_id===p.id); return (
+            <div key={p.id} style={{display:"flex",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+                <div style={{width:28,height:28,borderRadius:14,background:unlocked?C.success:"#e6e9f0",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>{unlocked?<Check size={16} color="#fff"/>:<Lock size={13} color={C.mut}/>}</div>
+                {i<premi.length-1 && <div style={{width:2,flex:1,background:unlocked?C.success:C.border,minHeight:22}}/>}
               </div>
-              <button onClick={()=>riscatta(p)} disabled={!canBuy} style={{...btnPrimary,padding:"9px 14px",opacity:canBuy?1:.5}}>{canBuy?"Riscatta":"Punti mancanti"}</button>
+              <div style={{...card,flex:1,marginBottom:12}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{...head,fontSize:16,fontWeight:700}}>{p.nome}</div>
+                    {p.descrizione && <div style={{fontSize:12.5,color:C.mut,marginTop:2}}>{p.descrizione}</div>}
+                  </div>
+                  <span style={{fontSize:12,fontWeight:800,color:C.accent,whiteSpace:"nowrap"}}>{p.costo_punti} pt</span>
+                </div>
+                {unlocked
+                  ? (ric ? <div style={{marginTop:10,display:"inline-flex",alignItems:"center",gap:6,fontSize:13,fontWeight:700,color:ric.stato==="consegnato"?C.success:C.amber}}><Check size={15}/> {ric.stato==="consegnato"?"Consegnato":"Richiesto"}</div>
+                         : <button onClick={()=>riscatta(p)} style={{...btnPrimary,marginTop:10,padding:"8px 14px"}}>Riscatta</button>)
+                  : <div style={{marginTop:10}}>
+                      <div style={{height:6,borderRadius:3,background:"#eef1f6",overflow:"hidden",marginBottom:4}}><div style={{width:Math.min(100,Math.round(P/p.costo_punti*100))+"%",height:"100%",background:C.primary,borderRadius:3}}/></div>
+                      <span style={{fontSize:12,color:C.mut}}>Ti mancano {Math.max(0,p.costo_punti-P)} punti per sbloccarlo</span>
+                    </div>}
+              </div>
             </div>); })}
          </div>}
-      {(riscatti||[]).length>0 && <><h3 style={{...sect,marginTop:22}}>I miei riscatti</h3>
+      {(riscatti||[]).length>0 && <><h3 style={{...sect,marginTop:14}}>I miei riscatti</h3>
         <div style={{display:"flex",flexDirection:"column",gap:9}}>
           {riscatti.map(r=>(
             <div key={r.id} style={{...card,display:"flex",alignItems:"center",gap:10}}>
-              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:14}}>{r.premio_nome}</div><div style={{fontSize:12,color:C.mut}}>{r.punti_spesi} punti · {fdate(r.created_at)}</div></div>
+              <div style={{flex:1}}><div style={{fontWeight:600,fontSize:14}}>{r.premio_nome}</div><div style={{fontSize:12,color:C.mut}}>{fdate(r.created_at)}</div></div>
               <Tag c={r.stato==="consegnato"?C.success:C.amber} bg={r.stato==="consegnato"?C.successSoft:C.amberSoft} t={r.stato==="consegnato"?"Consegnato":"Richiesto"}/>
             </div>))}
         </div></>}
@@ -1286,17 +1300,35 @@ function SPremi({ me, myPunti, riscatti, reloadRiscatti }){
 function AdminPremi(){
   const [premi,setPremi]=useState(null); const [editing,setEditing]=useState(null);
   const [ris,setRis]=useState([]); const [staff,setStaff]=useState({});
+  const [ptc,setPtc]=useState({pt_rsvp:"",pt_conferma:"",pt_valutazione:"",pt_profilo:""}); const [ptcMsg,setPtcMsg]=useState("");
   async function load(){
     const { data:p }=await supabase.from("premi").select("*").order("costo_punti"); setPremi(p||[]);
     const { data:r }=await supabase.from("riscatti").select("*").order("created_at",{ascending:false}); setRis(r||[]);
     const { data:st }=await supabase.from("staff_anagrafica").select("id,nome,cognome"); const m={}; (st||[]).forEach(x=>m[x.id]=x.nome+" "+x.cognome); setStaff(m);
+    const { data:imp }=await supabase.from("impostazioni").select("key,value").in("key",["pt_rsvp","pt_conferma","pt_valutazione","pt_profilo"]); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setPtc({pt_rsvp:im.pt_rsvp||"0",pt_conferma:im.pt_conferma||"0",pt_valutazione:im.pt_valutazione||"0",pt_profilo:im.pt_profilo||"0"});
   }
   useEffect(()=>{ load(); },[]);
   async function del(id){ if(!window.confirm("Eliminare questo premio?")) return; await supabase.from("premi").delete().eq("id",id); load(); }
   async function consegna(id){ await supabase.from("riscatti").update({stato:"consegnato"}).eq("id",id); load(); }
+  async function saveCfg(){ await supabase.from("impostazioni").upsert([{key:"pt_rsvp",value:String(parseInt(ptc.pt_rsvp)||0)},{key:"pt_conferma",value:String(parseInt(ptc.pt_conferma)||0)},{key:"pt_valutazione",value:String(parseInt(ptc.pt_valutazione)||0)},{key:"pt_profilo",value:String(parseInt(ptc.pt_profilo)||0)}],{onConflict:"key"}); setPtcMsg("Salvato"); setTimeout(()=>setPtcMsg(""),2000); }
   async function annullaRiscatto(id){ if(!window.confirm("Annullare questo riscatto? I punti torneranno disponibili allo staff.")) return; await supabase.from("riscatti").delete().eq("id",id); load(); }
   return (
     <div>
+      <div style={{...card,marginBottom:18}}>
+        <h3 style={{...sect,marginTop:0}}>Punti per ogni azione</h3>
+        <p style={{fontSize:12,color:C.mut,margin:"0 0 10px"}}>Quanti punti guadagna lo staff facendo queste cose.</p>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={lbl}>RSVP "ci sarò"</label><input type="number" value={ptc.pt_rsvp} onChange={e=>setPtc(a=>({...a,pt_rsvp:e.target.value}))} style={inp}/></div>
+          <div><label style={lbl}>Conferma avviso</label><input type="number" value={ptc.pt_conferma} onChange={e=>setPtc(a=>({...a,pt_conferma:e.target.value}))} style={inp}/></div>
+          <div><label style={lbl}>Valutazione evento</label><input type="number" value={ptc.pt_valutazione} onChange={e=>setPtc(a=>({...a,pt_valutazione:e.target.value}))} style={inp}/></div>
+          <div><label style={lbl}>Profilo completato</label><input type="number" value={ptc.pt_profilo} onChange={e=>setPtc(a=>({...a,pt_profilo:e.target.value}))} style={inp}/></div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}>
+          <button onClick={saveCfg} style={{...btnPrimary,padding:"9px 16px"}}>Salva punti azioni</button>
+          {ptcMsg && <span style={{color:C.success,fontSize:13,fontWeight:700}}>{ptcMsg}</span>}
+        </div>
+        <p style={{fontSize:11.5,color:C.mut,margin:"10px 0 0"}}>La presenza reale a un evento vale i punti impostati su quell'evento. I punti bonus si assegnano dalla scheda di ogni staff.</p>
+      </div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
         <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Catalogo premi</h2>
         <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuovo premio</button>
@@ -1365,7 +1397,7 @@ function PremioForm({ premio, onClose, onSaved }){
         <input value={f.nome} onChange={e=>set("nome",e.target.value)} placeholder="Es. Ingresso omaggio" style={inp}/>
         <label style={lbl}>Descrizione</label>
         <textarea value={f.descrizione} onChange={e=>set("descrizione",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
-        <label style={lbl}>Costo in punti</label>
+        <label style={lbl}>Punti per sbloccarlo</label>
         <input type="number" value={f.costo_punti} onChange={e=>set("costo_punti",e.target.value)} style={inp}/>
         <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
           <input type="checkbox" checked={f.attivo} onChange={e=>set("attivo",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
