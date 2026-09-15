@@ -22,6 +22,7 @@ const head={fontFamily:"'Barlow Condensed', sans-serif"};
 const ruoli={UFFICIO:"Ufficio",CA:"Capo Animazione",CM:"Capo Meta",ACM:"Aiuto Capo Meta",FOTOGRAFO:"Fotografo",VIDEOMAKER:"Videomaker",DJ:"DJ",VOCALIST:"Vocalist",BALLERINA:"Ballerino/a",STAFF:"Staff",CONTENT_CREATOR:"Content Creator",RM:"Resp. Materiali"};
 const rlabel=r=>ruoli[r]||r||"Staff";
 const isDonna=x=>{const v=(x||"").toUpperCase();return v.startsWith("D")||v.startsWith("F");};
+const PERCORSO_STEPS=[["Candidatura","Il primo passo per entrare nel team."],["Colloquio 1-to-1","Ci conosciamo di persona."],["Meeting di gruppo","Conosci il resto dello staff."],["Disponibilità estiva","Ci dici quando ci sei."],["Stage 1 & 2","Ti formi sul campo."],["Assegnazione ruolo","CA, CM, RM e gli altri ruoli."],["Convocazioni","Ti diciamo dove e quando."],["Road To Summer","La carica prima dell'estate."],["Formazione in meta","Pronti a far divertire."],["Reunion","La grande rimpatriata."],["Feedback & riconferme","Cresci e riparti più forte."]];
 const VAPID_PUBLIC="BORRtvXlPR6H4TDNvq9x41WbjyIeuQ3v45MKvcesotxjmRMyvWAqm6kYCEj2rK1BlCyw0mEVpHb_04vVcFHpCDI";
 function urlB64ToUint8Array(b){ const pad="=".repeat((4-b.length%4)%4); const s2=(b+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s2); const out=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i); return out; }
 async function attivaNotifiche(me){
@@ -363,7 +364,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {myPunti} punti</div>}
       </div>
       <h3 style={{...sect,marginTop:24}}>Il tuo percorso in Invibe</h3>
-      <PercorsoStaff/>
+      <PercorsoStaff stadio={me.percorso_stadio}/>
       <h3 style={{...sect,marginTop:24}}>Vita da staff</h3>
       <VitaStaff/>
       {openAvviso && <AvvisoModal c={openAvviso} confermato={!!letto[openAvviso.id]} onConferma={()=>conferma(openAvviso.id)} onClose={()=>setOpenAvviso(null)}/>}
@@ -1023,9 +1024,10 @@ function StaffDetail({ id, onBack }){
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   async function save(){
     setBusy(true); setMsg("");
-    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","attivo"];
+    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","attivo"];
     const p={}; keys.forEach(k=>{ p[k]=(f[k]===""?null:f[k]); });
     if(p.anno_ingresso) p.anno_ingresso=parseInt(p.anno_ingresso)||null;
+    p.percorso_stadio=(p.percorso_stadio===""||p.percorso_stadio==null)?null:parseInt(p.percorso_stadio);
     const { error:e1 }=await supabase.from("staff_anagrafica").update(p).eq("id",id);
     const { error:e2 }=await supabase.from("staff_note_interne").upsert({staff_id:id,potenziale:note.potenziale||null,note:note.note||null},{onConflict:"staff_id"});
     setBusy(false);
@@ -1069,6 +1071,11 @@ function StaffDetail({ id, onBack }){
         </select>
         <OField label="Zona" value={f.zona||""} onChange={v=>set("zona",v)} valid={true}/>
         <OField label="Anno d'ingresso" type="number" value={f.anno_ingresso||""} onChange={v=>set("anno_ingresso",v)} valid={true}/>
+        <label style={lbl}>Punto del percorso</label>
+        <select value={f.percorso_stadio??""} onChange={e=>set("percorso_stadio",e.target.value)} style={inp}>
+          <option value="">Non impostato</option>
+          {PERCORSO_STEPS.map((st,i)=><option key={i} value={i}>{(i+1)+". "+st[0]}</option>)}
+        </select>
         <OField label="Taglia divisa" value={f.taglia_maglia||""} onChange={v=>set("taglia_maglia",v)} valid={true}/>
         <OField label="Cosa fa nella vita / studi" value={f.professione||""} onChange={v=>set("professione",v)} valid={true}/>
         <OField label="Aspirazioni" value={f.aspirazioni||""} onChange={v=>set("aspirazioni",v)} valid={true}/>
@@ -1509,34 +1516,24 @@ function Line({ icon, t }){ return <div style={{display:"flex",alignItems:"cente
 function Info({ rows }){ return <div style={{...card,padding:0,overflow:"hidden"}}>{rows.map((r,i)=>(
   <div key={r[0]} style={{display:"flex",justifyContent:"space-between",padding:"12px 15px",borderTop:i?`1px solid ${C.border}`:"none"}}>
     <span style={{fontSize:13,color:C.mut}}>{r[0]}</span><span style={{fontSize:13.5,color:C.text,fontWeight:600}}>{r[1]}</span></div>))}</div>; }
-function PercorsoStaff(){
-  const steps=[
-    ["Candidatura","Il primo passo per entrare nel team."],
-    ["Colloquio 1-to-1","Ci conosciamo di persona."],
-    ["Meeting di gruppo","Conosci il resto dello staff."],
-    ["Disponibilità estiva","Ci dici quando ci sei."],
-    ["Stage 1 & 2","Ti formi sul campo."],
-    ["Assegnazione ruolo","CA, CM, RM e gli altri ruoli."],
-    ["Convocazioni","Ti diciamo dove e quando."],
-    ["Road To Summer","La carica prima dell'estate."],
-    ["Formazione in meta","Pronti a far divertire."],
-    ["Reunion","La grande rimpatriata."],
-    ["Feedback & riconferme","Cresci e riparti più forte."],
-  ];
+function PercorsoStaff({ stadio }){
+  const cur=(stadio===undefined||stadio===null||stadio==="")?-1:Number(stadio);
   return (
     <div style={card}>
-      {steps.map(([t,d],i)=>(
+      {PERCORSO_STEPS.map(([t,d],i)=>{ const done=i<cur, isCur=i===cur; const col=done?C.success:isCur?C.primary:C.border; return (
         <div key={i} style={{display:"flex",gap:12}}>
           <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
-            <div style={{width:12,height:12,borderRadius:6,background:C.primary,marginTop:4,flexShrink:0}}/>
-            {i<steps.length-1 && <div style={{width:2,flex:1,background:C.border,minHeight:18}}/>}
+            <div style={{width:isCur?16:12,height:isCur?16:12,borderRadius:8,background:col,marginTop:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{done && <Check size={9} color="#fff"/>}</div>
+            {i<PERCORSO_STEPS.length-1 && <div style={{width:2,flex:1,background:i<cur?C.success:C.border,minHeight:18}}/>}
           </div>
-          <div style={{paddingBottom:i<steps.length-1?14:0}}>
-            <div style={{fontWeight:700,fontSize:14.5}}>{t}</div>
+          <div style={{paddingBottom:i<PERCORSO_STEPS.length-1?14:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
+              <span style={{fontWeight:700,fontSize:14.5,color:(done||isCur)?C.text:C.mut}}>{t}</span>
+              {isCur && <span style={{fontSize:10,fontWeight:800,color:"#fff",background:C.primary,borderRadius:6,padding:"2px 7px"}}>SEI QUI</span>}
+            </div>
             <div style={{fontSize:12.5,color:C.mut,marginTop:1}}>{d}</div>
           </div>
-        </div>
-      ))}
+        </div>); })}
     </div>
   );
 }
