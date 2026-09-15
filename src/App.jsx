@@ -23,6 +23,7 @@ const ruoli={UFFICIO:"Ufficio",CA:"Capo Animazione",CM:"Capo Meta",ACM:"Aiuto Ca
 const rlabel=r=>ruoli[r]||r||"Staff";
 const isDonna=x=>{const v=(x||"").toUpperCase();return v.startsWith("D")||v.startsWith("F");};
 const ICONS={heart:Heart,coffee:Coffee,sparkles:Sparkles,gift:Gift,mappin:MapPin,cap:GraduationCap,star:Star,users:Users,calendar:Calendar,bell:Bell};
+const LEVELS=[[0,"Rookie"],[40,"Staff"],[120,"Pro"],[250,"Veterano"],[450,"Leggenda"]];
 const PERCORSO_STEPS=[["Candidatura","Il primo passo per entrare nel team."],["Colloquio 1-to-1","Ci conosciamo di persona."],["Meeting di gruppo","Conosci il resto dello staff."],["Disponibilità estiva","Ci dici quando ci sei."],["Stage 1 & 2","Ti formi sul campo."],["Assegnazione ruolo","CA, CM, RM e gli altri ruoli."],["Convocazioni","Ti diciamo dove e quando."],["Road To Summer","La carica prima dell'estate."],["Formazione in meta","Pronti a far divertire."],["Reunion","La grande rimpatriata."],["Feedback & riconferme","Cresci e riparti più forte."]];
 const VAPID_PUBLIC="BORRtvXlPR6H4TDNvq9x41WbjyIeuQ3v45MKvcesotxjmRMyvWAqm6kYCEj2rK1BlCyw0mEVpHb_04vVcFHpCDI";
 function urlB64ToUint8Array(b){ const pad="=".repeat((4-b.length%4)%4); const s2=(b+pad).replace(/-/g,"+").replace(/_/g,"/"); const raw=atob(s2); const out=new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i); return out; }
@@ -284,7 +285,7 @@ function NotifRow({ color, title, sub, onClick }){
 }
 
 function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica, novita, impost, vita }){
-  const [openAvviso,setOpenAvviso]=useState(null);
+  const [openAvviso,setOpenAvviso]=useState(null); const [clAll,setClAll]=useState(false);
   const upcoming=events.slice(0,6);
   const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
   const cl=classifica||[];
@@ -292,6 +293,10 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
   const myPunti=myIdx>=0?cl[myIdx].punti:0;
   const myRank=myIdx>=0?myIdx+1:0;
   const top=cl.slice(0,5);
+  const P=Number(myPunti)||0;
+  let lvlIdx=0; LEVELS.forEach((l,i)=>{ if(P>=l[0]) lvlIdx=i; });
+  const lvl=LEVELS[lvlIdx]; const nextL=LEVELS[lvlIdx+1];
+  const prog=nextL?Math.min(100,Math.round((P-lvl[0])/(nextL[0]-lvl[0])*100)):100;
   return (
     <div style={{padding:"16px 16px 28px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
@@ -354,7 +359,16 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
           {novita.map((n,i)=><News key={n.id} tag={n.tag||"Novità"} color={i%2?C.primary:C.accent} title={n.titolo} body={n.corpo||""} time={fdate(n.created_at)}/>)}
         </div>
       </>}
-      <h3 style={{...sect,marginTop:24}}>Classifica</h3>
+      <h3 style={{...sect,marginTop:24}}>Il tuo livello</h3>
+      <div style={{...card,marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+          <span style={{...head,fontSize:20,fontWeight:800,color:C.primary}}>{lvl[1]}</span>
+          <span style={{...head,fontSize:16,fontWeight:800,color:C.accent}}>{P} punti</span>
+        </div>
+        <div style={{height:9,borderRadius:5,background:"#eef1f6",overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:`linear-gradient(90deg,${C.primary},${C.accent})`,borderRadius:5}}/></div>
+        <p style={{fontSize:12,color:C.mut,margin:"7px 0 0"}}>{nextL?`Ti mancano ${Math.max(0,nextL[0]-P)} punti per il livello "${nextL[1]}"`:"Hai raggiunto il livello massimo!"}</p>
+      </div>
+      <h3 style={sect}>Classifica</h3>
       <div style={card}>
         {top.length===0 ? <span style={{color:C.mut,fontSize:13}}>Ancora nessun punto assegnato. Partecipa agli eventi!</span>
          : top.map((r,i)=>{ const meRow=r.staff_id===me.id; return (
@@ -363,7 +377,8 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
              <span style={{flex:1,fontWeight:meRow?700:600,fontSize:14,color:meRow?C.primary:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}{meRow?" (tu)":""}</span>
              <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
            </div>); })}
-        {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {myPunti} punti</div>}
+        {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {P} punti</div>}
+        {cl.length>5 && <button onClick={()=>setClAll(true)} style={{...btnGhost,width:"100%",marginTop:12,fontSize:13}}>Classifica completa</button>}
       </div>
       <h3 style={{...sect,marginTop:24}}>Il tuo percorso in Invibe</h3>
       <PercorsoStaff stadio={me.percorso_stadio}/>
@@ -371,6 +386,24 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         <h3 style={{...sect,marginTop:24}}>Vita da staff</h3>
         <VitaStaff items={vita}/>
       </>}
+      {clAll && (
+        <div onClick={()=>setClAll(false)} style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Classifica completa</h3>
+              <button onClick={()=>setClAll(false)} style={iconBtn}><X size={22} color={C.mut}/></button>
+            </div>
+            <div style={{overflowY:"auto"}}>
+              {cl.map((r,i)=>{ const meRow=r.staff_id===me.id; return (
+                <div key={r.staff_id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none"}}>
+                  <span style={{...head,fontSize:15,fontWeight:800,color:i<3?C.accent:C.mut,width:26}}>{i+1}</span>
+                  <span style={{flex:1,fontWeight:meRow?700:600,fontSize:14,color:meRow?C.primary:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}{meRow?" (tu)":""}</span>
+                  <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
+                </div>); })}
+            </div>
+          </div>
+        </div>
+      )}
       {openAvviso && <AvvisoModal c={openAvviso} confermato={!!letto[openAvviso.id]} onConferma={()=>conferma(openAvviso.id)} onClose={()=>setOpenAvviso(null)}/>}
     </div>
   );
@@ -904,13 +937,13 @@ function AdminComunicazioni({ me }){
 
 function VitaForm({ item, onClose, onSaved }){
   const isEdit=!!item.id;
-  const [f,setF]=useState({titolo:item.titolo||"",sottotitolo:item.sottotitolo||"",icona:item.icona||"sparkles",ordine:(item.ordine!=null?item.ordine:0),attivo:item.id?!!item.attivo:true});
+  const [f,setF]=useState({titolo:item.titolo||"",sottotitolo:item.sottotitolo||"",contenuto:item.contenuto||"",icona:item.icona||"sparkles",ordine:(item.ordine!=null?item.ordine:0),attivo:item.id?!!item.attivo:true});
   const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const ok=f.titolo.trim();
   async function save(){
     if(!ok||busy) return; setBusy(true); setErr("");
-    const payload={titolo:f.titolo.trim(),sottotitolo:f.sottotitolo.trim()||null,icona:f.icona,ordine:(f.ordine===""||f.ordine==null)?0:(parseInt(f.ordine)||0),attivo:f.attivo};
+    const payload={titolo:f.titolo.trim(),sottotitolo:f.sottotitolo.trim()||null,contenuto:f.contenuto.trim()||null,icona:f.icona,ordine:(f.ordine===""||f.ordine==null)?0:(parseInt(f.ordine)||0),attivo:f.attivo};
     let error;
     if(isEdit){ ({ error }=await supabase.from("vita_staff").update(payload).eq("id",item.id)); }
     else { ({ error }=await supabase.from("vita_staff").insert(payload)); }
@@ -929,6 +962,8 @@ function VitaForm({ item, onClose, onSaved }){
         <input value={f.titolo} onChange={e=>set("titolo",e.target.value)} placeholder="Es. Aperitivi & rinfreschi" style={inp}/>
         <label style={lbl}>Sottotitolo</label>
         <input value={f.sottotitolo} onChange={e=>set("sottotitolo",e.target.value)} placeholder="Breve descrizione" style={inp}/>
+        <label style={lbl}>Contenuto esteso (si apre al tocco)</label>
+        <textarea value={f.contenuto} onChange={e=>set("contenuto",e.target.value)} rows={4} placeholder="Racconta più nel dettaglio questa iniziativa…" style={{...inp,resize:"vertical"}}/>
         <label style={lbl}>Icona</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:8,marginTop:2}}>
           {Object.keys(ICONS).map(k=>{ const Ic=ICONS[k]; const on=f.icona===k; return <button key={k} onClick={()=>set("icona",k)} style={{width:42,height:42,borderRadius:11,border:`1px solid ${on?C.primary:C.border}`,background:on?C.primarySoft:C.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={19} color={on?C.primary:C.mut}/></button>; })}
@@ -1110,10 +1145,11 @@ function StaffDetail({ id, onBack }){
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   async function save(){
     setBusy(true); setMsg("");
-    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","attivo"];
+    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","punti_bonus","attivo"];
     const p={}; keys.forEach(k=>{ p[k]=(f[k]===""?null:f[k]); });
     if(p.anno_ingresso) p.anno_ingresso=parseInt(p.anno_ingresso)||null;
     p.percorso_stadio=(p.percorso_stadio===""||p.percorso_stadio==null)?null:parseInt(p.percorso_stadio);
+    p.punti_bonus=(p.punti_bonus===""||p.punti_bonus==null)?0:(parseInt(p.punti_bonus)||0);
     const { error:e1 }=await supabase.from("staff_anagrafica").update(p).eq("id",id);
     const { error:e2 }=await supabase.from("staff_note_interne").upsert({staff_id:id,potenziale:note.potenziale||null,note:note.note||null},{onConflict:"staff_id"});
     setBusy(false);
@@ -1162,6 +1198,8 @@ function StaffDetail({ id, onBack }){
           <option value="">Non impostato</option>
           {PERCORSO_STEPS.map((st,i)=><option key={i} value={i}>{(i+1)+". "+st[0]}</option>)}
         </select>
+        <label style={lbl}>Punti bonus (gamification)</label>
+        <input type="number" value={f.punti_bonus??0} onChange={e=>set("punti_bonus",e.target.value)} style={inp}/>
         <OField label="Taglia divisa" value={f.taglia_maglia||""} onChange={v=>set("taglia_maglia",v)} valid={true}/>
         <OField label="Cosa fa nella vita / studi" value={f.professione||""} onChange={v=>set("professione",v)} valid={true}/>
         <OField label="Aspirazioni" value={f.aspirazioni||""} onChange={v=>set("aspirazioni",v)} valid={true}/>
@@ -1693,14 +1731,36 @@ function PercorsoStaff({ stadio }){
 }
 
 function VitaStaff({ items }){
+  const [open,setOpen]=useState(null);
   return (
+    <>
     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11}}>
       {(items||[]).map(t=>{ const Ic=ICONS[t.icona]||Sparkles; return (
-        <div key={t.id} style={{...card,padding:14}}>
+        <button key={t.id} onClick={()=>setOpen(t)} style={{...card,padding:14,textAlign:"left",cursor:"pointer",border:"none",display:"block"}}>
           <div style={{width:36,height:36,borderRadius:10,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><Ic size={18} color={C.accent}/></div>
           <div style={{fontWeight:700,fontSize:13.5}}>{t.titolo}</div>
           {t.sottotitolo && <div style={{fontSize:11.5,color:C.mut,marginTop:2,lineHeight:1.35}}>{t.sottotitolo}</div>}
-        </div>); })}
+        </button>); })}
+    </div>
+    {open && <VitaModal item={open} onClose={()=>setOpen(null)}/>}
+    </>
+  );
+}
+
+function VitaModal({ item, onClose }){
+  const Ic=ICONS[item.icona]||Sparkles;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:22}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:12}}>
+          <div style={{width:48,height:48,borderRadius:13,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={24} color={C.accent}/></div>
+          <button onClick={onClose} style={iconBtn}><X size={22} color={C.mut}/></button>
+        </div>
+        <h3 style={{...head,fontSize:23,fontWeight:800,margin:"0 0 4px"}}>{item.titolo}</h3>
+        {item.sottotitolo && <p style={{margin:0,fontSize:14,color:C.mut}}>{item.sottotitolo}</p>}
+        {item.contenuto ? <p style={{margin:"14px 0 0",fontSize:14.5,color:C.text,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{item.contenuto}</p>
+          : <p style={{margin:"14px 0 0",fontSize:13.5,color:C.mut}}>Presto altri dettagli su questa iniziativa.</p>}
+      </div>
     </div>
   );
 }
