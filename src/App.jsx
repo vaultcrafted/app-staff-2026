@@ -1092,12 +1092,20 @@ function ProfiloEdit({ me, onClose, onSaved }){
 function StaffDetail({ id, onBack }){
   const [f,setF]=useState(null);
   const [note,setNote]=useState({potenziale:"",note:""});
+  const [storico,setStorico]=useState([]);
   const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
   useEffect(()=>{ (async()=>{
     const { data:r }=await supabase.from("staff_anagrafica").select("*").eq("id",id).maybeSingle();
     setF(r||null);
     const { data:n }=await supabase.from("staff_note_interne").select("potenziale,note").eq("staff_id",id).maybeSingle();
     if(n) setNote({potenziale:n.potenziale||"",note:n.note||""});
+    const { data:pp }=await supabase.from("eventi_partecipazioni").select("evento_id,rsvp,presente").eq("staff_id",id);
+    const { data:vv }=await supabase.from("valutazioni").select("evento_id,voto").eq("staff_id",id).eq("tipo","uff_su_staff");
+    const ids=(pp||[]).map(x=>x.evento_id);
+    if(ids.length){ const { data:evs }=await supabase.from("eventi").select("id,titolo,inizio,categoria").in("id",ids); const vm={}; (vv||[]).forEach(x=>vm[x.evento_id]=x.voto);
+      const list=(pp||[]).map(p=>{ const e=(evs||[]).find(x=>x.id===p.evento_id)||{}; return {...p,titolo:e.titolo,inizio:e.inizio,voto:vm[p.evento_id]}; }).sort((a,b)=>new Date(b.inizio||0)-new Date(a.inizio||0));
+      setStorico(list);
+    } else setStorico([]);
   })(); },[id]);
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   async function save(){
@@ -1165,6 +1173,20 @@ function StaffDetail({ id, onBack }){
         <OField label="Primo soccorso" value={f.att_primo_soccorso||""} onChange={v=>set("att_primo_soccorso",v)} valid={true} placeholder="Es. sì / data"/>
         <OField label="BLSD" value={f.att_blsd||""} onChange={v=>set("att_blsd",v)} valid={true}/>
         <OField label="Libretto assicurativo" value={f.att_libretto||""} onChange={v=>set("att_libretto",v)} valid={true}/>
+      </div>
+      <div style={{...card,marginTop:14}}>
+        <h3 style={{...sect,marginTop:0}}>Storico eventi</h3>
+        {storico.length===0 ? <span style={{color:C.mut,fontSize:13}}>Nessuna partecipazione registrata.</span>
+         : storico.map((e,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none",flexWrap:"wrap"}}>
+            <div style={{flex:1,minWidth:120}}>
+              <div style={{fontWeight:600,fontSize:13.5}}>{e.titolo||"—"}</div>
+              <div style={{fontSize:11.5,color:C.mut}}>{fdate(e.inizio)}</div>
+            </div>
+            {e.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:e.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="No"/>:null}
+            {e.presente===true && <Tag c={C.primary} bg={C.primarySoft} t="Presente"/>}
+            {e.voto && <span style={{display:"flex",alignItems:"center",gap:3,fontSize:12.5,fontWeight:700,color:C.amber}}><Star size={13} color={C.amber} fill={C.amber}/>{e.voto}</span>}
+          </div>))}
       </div>
       <div style={{...card,marginTop:14,borderLeft:`4px solid ${C.accent}`}}>
         <h3 style={{...sect,marginTop:0}}>Note interne · solo ufficio</h3>
