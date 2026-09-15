@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap, BarChart3
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -510,14 +510,15 @@ function EventDetail({ ev, part, onA, onBack, me }){
 function Admin({ me, onLogout, onBack }){
   const desktop=useMedia("(min-width:860px)");
   const [section,setSection]=useState("staff");
-  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["presenze",Check,"Presenze"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["economia",Wallet,"Economia"],["contratti",FileText,"Contratti"]];
+  const NAV=[["staff",Users,"Staff"],["eventi",Calendar,"Eventi"],["stats",BarChart3,"Stats"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["economia",Wallet,"Economia"],["contratti",FileText,"Contratti"]];
   const body = section==="staff" ? <AdminStaff/>
     : section==="eventi" ? <AdminEventi me={me}/>
     : section==="avvisi" ? <AdminComunicazioni me={me}/>
     : section==="premi" ? <AdminPremi/>
     : section==="economia" ? <AdminEconomia/>
     : section==="contratti" ? <AdminContratti/>
-    : <div style={{...card,color:C.mut,fontSize:14}}>Presenze — si gestiscono dentro ogni evento (Eventi › Gestisci presenze).</div>;
+    : section==="stats" ? <AdminStats/>
+    : null;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       {desktop &&
@@ -1510,6 +1511,60 @@ function PasswordEdit({ me, onClose }){
           <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} Salva</button>
         </div>
         <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>
+    </div>
+  );
+}
+
+function AdminStats(){
+  const [d,setD]=useState(null);
+  useEffect(()=>{ (async()=>{
+    const { data:staff }=await supabase.from("staff_anagrafica").select("ruolo,attivo");
+    const { count:nEventi }=await supabase.from("eventi").select("*",{count:"exact",head:true});
+    const { count:nComun }=await supabase.from("comunicazioni").select("*",{count:"exact",head:true});
+    const { data:part }=await supabase.from("eventi_partecipazioni").select("rsvp,presente");
+    const { data:cl }=await supabase.rpc("classifica");
+    const sa=staff||[];
+    const perRuolo={}; sa.forEach(x=>{ const r=x.ruolo||"—"; perRuolo[r]=(perRuolo[r]||0)+1; });
+    setD({ tot:sa.length, att:sa.filter(x=>x.attivo).length, nEventi:nEventi||0, nComun:nComun||0,
+      perRuolo, nPres:(part||[]).filter(x=>x.presente===true).length, nSi:(part||[]).filter(x=>x.rsvp==="ci_saro").length,
+      top:(cl||[]).slice(0,5) });
+  })(); },[]);
+  if(!d) return <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>;
+  const ruoliArr=Object.entries(d.perRuolo).sort((a,b)=>b[1]-a[1]);
+  const maxN=Math.max(1,...ruoliArr.map(x=>x[1]));
+  return (
+    <div>
+      <h2 style={{...head,fontSize:22,fontWeight:800,margin:"0 0 14px"}}>Statistiche</h2>
+      <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <BigStat n={d.tot} l="Staff totali" Ic={Users} col={C.primary}/>
+        <BigStat n={d.att} l="Attivi" Ic={Check} col={C.success}/>
+        <BigStat n={d.nEventi} l="Eventi" Ic={Calendar} col={C.accent}/>
+        <BigStat n={d.nPres} l="Presenze segnate" Ic={Check} col={C.primary}/>
+      </div>
+      <div style={{...card,marginBottom:14}}>
+        <h3 style={{...sect,marginTop:0}}>Staff per ruolo</h3>
+        {ruoliArr.map(([r,n])=>{ const w=Math.round(n/maxN*100); return (
+          <div key={r} style={{marginBottom:9}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}><span>{rlabel(r)}</span><span style={{fontWeight:700}}>{n}</span></div>
+            <div style={{height:8,borderRadius:4,background:"#eef1f6",overflow:"hidden"}}><div style={{width:w+"%",height:"100%",background:C.primary,borderRadius:4}}/></div>
+          </div>); })}
+      </div>
+      <div style={{...card,marginBottom:14}}>
+        <h3 style={{...sect,marginTop:0}}>Partecipazione</h3>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"6px 0"}}><span style={{color:C.mut}}>Risposte "ci sarò"</span><span style={{fontWeight:700}}>{d.nSi}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"6px 0",borderTop:`1px solid ${C.border}`}}><span style={{color:C.mut}}>Presenze reali segnate</span><span style={{fontWeight:700}}>{d.nPres}</span></div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:14,padding:"6px 0",borderTop:`1px solid ${C.border}`}}><span style={{color:C.mut}}>Comunicazioni inviate</span><span style={{fontWeight:700}}>{d.nComun}</span></div>
+      </div>
+      <div style={card}>
+        <h3 style={{...sect,marginTop:0}}>Classifica punti (top 5)</h3>
+        {d.top.length===0 ? <span style={{color:C.mut,fontSize:13}}>Ancora nessun punto.</span>
+         : d.top.map((r,i)=>(
+          <div key={r.staff_id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none"}}>
+            <span style={{...head,fontSize:16,fontWeight:800,color:i<3?C.accent:C.mut,width:22}}>{i+1}</span>
+            <span style={{flex:1,fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}</span>
+            <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
+          </div>))}
       </div>
     </div>
   );
