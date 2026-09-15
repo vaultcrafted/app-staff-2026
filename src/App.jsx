@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -362,6 +362,10 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
            </div>); })}
         {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {myPunti} punti</div>}
       </div>
+      <h3 style={{...sect,marginTop:24}}>Il tuo percorso in Invibe</h3>
+      <PercorsoStaff/>
+      <h3 style={{...sect,marginTop:24}}>Vita da staff</h3>
+      <VitaStaff/>
       {openAvviso && <AvvisoModal c={openAvviso} confermato={!!letto[openAvviso.id]} onConferma={()=>conferma(openAvviso.id)} onClose={()=>setOpenAvviso(null)}/>}
     </div>
   );
@@ -1505,6 +1509,60 @@ function Line({ icon, t }){ return <div style={{display:"flex",alignItems:"cente
 function Info({ rows }){ return <div style={{...card,padding:0,overflow:"hidden"}}>{rows.map((r,i)=>(
   <div key={r[0]} style={{display:"flex",justifyContent:"space-between",padding:"12px 15px",borderTop:i?`1px solid ${C.border}`:"none"}}>
     <span style={{fontSize:13,color:C.mut}}>{r[0]}</span><span style={{fontSize:13.5,color:C.text,fontWeight:600}}>{r[1]}</span></div>))}</div>; }
+function PercorsoStaff(){
+  const steps=[
+    ["Candidatura","Il primo passo per entrare nel team."],
+    ["Colloquio 1-to-1","Ci conosciamo di persona."],
+    ["Meeting di gruppo","Conosci il resto dello staff."],
+    ["Disponibilità estiva","Ci dici quando ci sei."],
+    ["Stage 1 & 2","Ti formi sul campo."],
+    ["Assegnazione ruolo","CA, CM, RM e gli altri ruoli."],
+    ["Convocazioni","Ti diciamo dove e quando."],
+    ["Road To Summer","La carica prima dell'estate."],
+    ["Formazione in meta","Pronti a far divertire."],
+    ["Reunion","La grande rimpatriata."],
+    ["Feedback & riconferme","Cresci e riparti più forte."],
+  ];
+  return (
+    <div style={card}>
+      {steps.map(([t,d],i)=>(
+        <div key={i} style={{display:"flex",gap:12}}>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
+            <div style={{width:12,height:12,borderRadius:6,background:C.primary,marginTop:4,flexShrink:0}}/>
+            {i<steps.length-1 && <div style={{width:2,flex:1,background:C.border,minHeight:18}}/>}
+          </div>
+          <div style={{paddingBottom:i<steps.length-1?14:0}}>
+            <div style={{fontWeight:700,fontSize:14.5}}>{t}</div>
+            <div style={{fontSize:12.5,color:C.mut,marginTop:1}}>{d}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function VitaStaff(){
+  const tiles=[
+    [Heart,"Ci siamo per te","Supporto e ascolto, sempre."],
+    [Coffee,"Aperitivi & rinfreschi","Momenti insieme fuori dal lavoro."],
+    [Sparkles,"ON VIBE","Lo spirito che ci tiene uniti."],
+    [Gift,"Natale & regali","Non ci dimentichiamo di te."],
+    [MapPin,"Gruppi per zona","Vicini anche vicino casa."],
+    [GraduationCap,"Formazione","Impari e cresci con noi."],
+  ];
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11}}>
+      {tiles.map(([Ic,t,d],i)=>(
+        <div key={i} style={{...card,padding:14}}>
+          <div style={{width:36,height:36,borderRadius:10,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8}}><Ic size={18} color={C.accent}/></div>
+          <div style={{fontWeight:700,fontSize:13.5}}>{t}</div>
+          <div style={{fontSize:11.5,color:C.mut,marginTop:2,lineHeight:1.35}}>{d}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function News({ tag, color, title, body, time }){ return (
   <div style={{...card,display:"flex",gap:12}}>
     <div style={{width:4,alignSelf:"stretch",background:color,borderRadius:3,flexShrink:0}}/>
