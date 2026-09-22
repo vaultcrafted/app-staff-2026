@@ -1842,40 +1842,18 @@ function Info({ rows }){ return <div style={{...card,padding:0,overflow:"hidden"
     <span style={{fontSize:13,color:C.mut}}>{r[0]}</span><span style={{fontSize:13.5,color:C.text,fontWeight:600}}>{r[1]}</span></div>))}</div>; }
 function PercorsoStaff({ stadio, desktop }){
   const cur=(stadio===undefined||stadio===null||stadio==="")?-1:Number(stadio);
-  if(true){
-    return (
-      <div style={{...card,overflowX:"auto"}}>
-        <div style={{display:"flex",minWidth:PERCORSO_STEPS.length*126}}>
-          {PERCORSO_STEPS.map(([t,d],i)=>{ const done=i<cur, isCur=i===cur; const col=done?C.success:isCur?C.primary:"#dfe4ec"; return (
-            <div key={i} style={{flex:1,minWidth:118,position:"relative",paddingTop:6}}>
-              {i<PERCORSO_STEPS.length-1 && <div style={{position:"absolute",top:19,left:"50%",width:"100%",height:2,background:i<cur?C.success:"#e6eaf1"}}/>}
-              <div style={{position:"relative",width:26,height:26,borderRadius:13,background:col,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",zIndex:1}}>{done&&<Check size={14} color="#fff"/>}{isCur&&<div style={{width:9,height:9,borderRadius:5,background:"#fff"}}/>}</div>
-              <div style={{textAlign:"center",padding:"10px 6px 0"}}>
-                <div style={{fontWeight:700,fontSize:12.5,color:(done||isCur)?C.text:C.mut}}>{t}</div>
-                {isCur && <span style={{display:"inline-block",fontSize:9,fontWeight:800,color:"#fff",background:C.primary,borderRadius:6,padding:"2px 7px",margin:"3px 0"}}>SEI QUI</span>}
-                <div style={{fontSize:10.5,color:C.mut,marginTop:2,lineHeight:1.3}}>{d}</div>
-              </div>
-            </div>); })}
-        </div>
-      </div>
-    );
-  }
   return (
     <div style={card}>
-      {PERCORSO_STEPS.map(([t,d],i)=>{ const done=i<cur, isCur=i===cur; const col=done?C.success:isCur?C.primary:C.border; return (
-        <div key={i} style={{display:"flex",gap:12}}>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"center"}}>
-            <div style={{width:isCur?16:12,height:isCur?16:12,borderRadius:8,background:col,marginTop:4,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{done && <Check size={9} color="#fff"/>}</div>
-            {i<PERCORSO_STEPS.length-1 && <div style={{width:2,flex:1,background:i<cur?C.success:C.border,minHeight:18}}/>}
-          </div>
-          <div style={{paddingBottom:i<PERCORSO_STEPS.length-1?14:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:7,flexWrap:"wrap"}}>
-              <span style={{fontWeight:700,fontSize:14.5,color:(done||isCur)?C.text:C.mut}}>{t}</span>
-              {isCur && <span style={{fontSize:10,fontWeight:800,color:"#fff",background:C.primary,borderRadius:6,padding:"2px 7px"}}>SEI QUI</span>}
+      <div style={{display:"grid",gridTemplateColumns:desktop?"repeat(3,1fr)":"repeat(2,1fr)",gap:14}}>
+        {PERCORSO_STEPS.map(([t,d],i)=>{ const done=i<cur, isCur=i===cur; return (
+          <div key={i} style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+            <div style={{width:24,height:24,borderRadius:12,flexShrink:0,background:done?C.success:isCur?C.primary:"#e6e9f0",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed', sans-serif",fontSize:12,fontWeight:800,color:(done||isCur)?"#fff":C.mut}}>{done?<Check size={13} color="#fff"/>:i+1}</div>
+            <div style={{minWidth:0,paddingTop:1}}>
+              <div style={{fontWeight:700,fontSize:13,color:(done||isCur)?C.text:C.mut,lineHeight:1.2}}>{t}</div>
+              {isCur && <span style={{display:"inline-block",fontSize:9,fontWeight:800,color:"#fff",background:C.primary,borderRadius:6,padding:"1px 6px",marginTop:3}}>SEI QUI</span>}
             </div>
-            <div style={{fontSize:12.5,color:C.mut,marginTop:1}}>{d}</div>
-          </div>
-        </div>); })}
+          </div>); })}
+      </div>
     </div>
   );
 }
