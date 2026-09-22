@@ -204,7 +204,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const [tab,setTab]=useState("home");
   const [openEvent,setOpenEvent]=useState(null);
   const [events,setEvents]=useState([]); const [rsvp,setRsvp]=useState({});
-  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [classifica,setClassifica]=useState([]); const [riscatti,setRiscatti]=useState([]); const [novita,setNovita]=useState([]); const [impost,setImpost]=useState({}); const [vita,setVita]=useState([]);
+  const [coms,setComs]=useState([]); const [letto,setLetto]=useState({}); const [myPunti,setMyPunti]=useState(0); const [riscatti,setRiscatti]=useState([]); const [novita,setNovita]=useState([]); const [impost,setImpost]=useState({}); const [vita,setVita]=useState([]);
   useEffect(()=>{ (async()=>{
     const { data:ev }=await supabase.from("eventi").select("*").order("inizio",{ascending:true});
     setEvents(ev||[]);
@@ -214,7 +214,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     setComs(c||[]);
     const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at").eq("staff_id",me.id);
     const lm={}; (le||[]).forEach(x=>{ if(x.confermata_at) lm[x.comunicazione_id]=true; }); setLetto(lm);
-    const { data:cl }=await supabase.rpc("classifica"); setClassifica(cl||[]);
+    const { data:mp }=await supabase.rpc("miei_punti"); setMyPunti(Number(mp)||0);
     await loadRiscatti();
     const { data:nv }=await supabase.from("novita").select("*").eq("attivo",true).order("created_at",{ascending:false}); setNovita(nv||[]);
     const { data:imp }=await supabase.from("impostazioni").select("key,value"); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setImpost(im);
@@ -228,13 +228,12 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   async function loadRiscatti(){ const { data }=await supabase.from("riscatti").select("*").eq("staff_id",me.id).order("created_at",{ascending:false}); setRiscatti(data||[]); }
   async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
   const ev=events.find(e=>e.id===openEvent);
-  const myPunti=(classifica.find(x=>x.staff_id===me.id)||{}).punti||0;
   const [notifOpen,setNotifOpen]=useState(false); const [notifClosing,setNotifClosing]=useState(false); const [avvisoOpen,setAvvisoOpen]=useState(null);
   const unread=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]).length;
   const closeNotif=()=>{ setNotifClosing(true); setTimeout(()=>{ setNotifOpen(false); setNotifClosing(false); },210); };
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
-    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} classifica={classifica} novita={novita} impost={impost} vita={vita}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} myPunti={myPunti} novita={novita} impost={impost} vita={vita}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : tab==="premi" ? <SPremi me={me} myPunti={myPunti} riscatti={riscatti} reloadRiscatti={loadRiscatti}/>
@@ -288,15 +287,10 @@ function NotifRow({ color, title, sub, onClick }){
   </button>;
 }
 
-function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, classifica, novita, impost, vita }){
+function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, myPunti, novita, impost, vita }){
   const [openAvviso,setOpenAvviso]=useState(null); const [clAll,setClAll]=useState(false);
   const upcoming=events.slice(0,6);
   const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
-  const cl=classifica||[];
-  const myIdx=cl.findIndex(x=>x.staff_id===me.id);
-  const myPunti=myIdx>=0?cl[myIdx].punti:0;
-  const myRank=myIdx>=0?myIdx+1:0;
-  const top=cl.slice(0,5);
   const P=Number(myPunti)||0;
   let lvlIdx=0; LEVELS.forEach((l,i)=>{ if(P>=l[0]) lvlIdx=i; });
   const lvl=LEVELS[lvlIdx]; const nextL=LEVELS[lvlIdx+1];
@@ -468,6 +462,7 @@ function EventDetail({ ev, part, onA, onBack, me }){
   const rs=part.rsvp;
   const [citta,setCitta]=useState(part.citta_partenza||"");
   const [auto,setAuto]=useState(part.ha_macchina);
+  const [motivo,setMotivo]=useState(part.motivo_assenza||"");
   const [voto,setVoto]=useState(0); const [commento,setCommento]=useState("");
   useEffect(()=>{ supabase.from("valutazioni").select("voto,commento").eq("evento_id",ev.id).eq("staff_id",me.id).eq("tipo","staff_su_evento").maybeSingle().then(({data})=>{ if(data){ setVoto(data.voto||0); setCommento(data.commento||""); } }); },[ev.id]);
   async function saveVal(v,c){ await supabase.from("valutazioni").upsert({evento_id:ev.id,staff_id:me.id,tipo:"staff_su_evento",voto:v||null,commento:(c||"").trim()||null},{onConflict:"evento_id,staff_id,tipo"}); }
@@ -499,6 +494,12 @@ function EventDetail({ ev, part, onA, onBack, me }){
               <button onClick={()=>{setAuto(true);onA(ev.id,{ha_macchina:true});}} style={tb(auto===true)}>Sì</button>
               <button onClick={()=>{setAuto(false);onA(ev.id,{ha_macchina:false});}} style={{...tb(auto===false),background:auto===false?"#eef1f6":C.surface,color:C.text,border:auto===false?"none":`1px solid ${C.border}`}}>No</button>
             </div>
+          </div>
+        )}
+        {rs==="non_ci_saro" && (
+          <div style={{...card,marginTop:14}}>
+            <label style={lbl}>Perché non ci sarai?</label>
+            <textarea value={motivo} onChange={e=>setMotivo(e.target.value)} onBlur={()=>onA(ev.id,{motivo_assenza:motivo.trim()||null})} rows={2} placeholder="Una breve motivazione per l'ufficio" style={{...inp,resize:"vertical"}}/>
           </div>
         )}
         {rs && <p style={{fontSize:12.5,color:C.mut,margin:"12px 2px 0"}}>{rs==="ci_saro"?"Risposta salvata. L'ufficio confermerà la presenza alla serata.":"Ok, l'ufficio è stato avvisato."}</p>}
@@ -691,8 +692,8 @@ function EventoPresenze({ ev, onBack }){
   async function load(){
     const { data:st }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,attivo").eq("attivo",true).order("cognome");
     setStaff(st||[]);
-    const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id,rsvp,presente,citta_partenza,ha_macchina").eq("evento_id",ev.id);
-    const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente,citta_partenza:p.citta_partenza,ha_macchina:p.ha_macchina}); setPart(m);
+    const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id,rsvp,presente,citta_partenza,ha_macchina,motivo_assenza").eq("evento_id",ev.id);
+    const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente,citta_partenza:p.citta_partenza,ha_macchina:p.ha_macchina,motivo_assenza:p.motivo_assenza}); setPart(m);
     const { data:vv }=await supabase.from("valutazioni").select("staff_id,voto,commento").eq("evento_id",ev.id).eq("tipo","uff_su_staff");
     const vm={}; (vv||[]).forEach(x=>vm[x.staff_id]={voto:x.voto,commento:x.commento}); setValut(vm);
   }
@@ -755,6 +756,7 @@ function EventoPresenze({ ev, onBack }){
                 <div style={{fontWeight:600,fontSize:14}}>{s.nome} {s.cognome}</div>
                 <div style={{fontSize:12,color:C.mut}}>{rlabel(s.ruolo)}</div>
                 {p.rsvp==="ci_saro" && <div style={{fontSize:12,color:C.mut,marginTop:3}}>Parte da: {p.citta_partenza||"—"} · Macchina: {macchinaTxt(p.ha_macchina)}</div>}
+                {p.rsvp==="non_ci_saro" && p.motivo_assenza && <div style={{fontSize:12,color:C.mut,marginTop:3,fontStyle:"italic"}}>Motivo: {p.motivo_assenza}</div>}
               </div>
               {p.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:p.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="Non ci sarò"/>:<Tag c={C.mut} bg="#f2f5fb" t="Nessuna risposta"/>}
               <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
