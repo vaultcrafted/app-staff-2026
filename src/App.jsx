@@ -144,7 +144,7 @@ function Onboarding({ me, onDone, onLogout }){
   }
   return (
     <div style={{minHeight:"100%",background:C.bg,display:"flex",flexDirection:"column"}}>
-      <div style={{background:C.primary,flexShrink:0}}>
+      <div style={{background:C.primary,flexShrink:0,paddingTop:"env(safe-area-inset-top,0px)"}}>
         <div style={{maxWidth:640,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <img src={LOGO_W} alt="INVIBE" style={{height:22}}/>
           <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
@@ -242,7 +242,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     : <SProfilo me={me} onLogout={onLogout} reload={reload}/>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
-      <div style={{background:C.primary,flexShrink:0}}>
+      <div style={{background:C.primary,flexShrink:0,paddingTop:"env(safe-area-inset-top,0px)"}}>
         <div style={{maxWidth:1080,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
           <img src={LOGO_W} alt="INVIBE" style={{height:22,display:"block"}}/>
           {desktop && <div style={{display:"flex",gap:6}}>
@@ -605,7 +605,7 @@ function Admin({ me, onLogout, onBack }){
         <button onClick={onLogout} style={{...iconBtn,color:C.sidebarMut,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 0"}}><LogOut size={20}/><span style={{fontSize:10.5}}>Esci</span></button>
       </div>}
       <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
-        <div style={{background:C.primary,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 18px",height:56}}>
+        <div style={{background:C.primary,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 18px",minHeight:56,paddingTop:"env(safe-area-inset-top,0px)"}}>
           <div style={{display:"flex",alignItems:"center",gap:9,color:"#fff"}}>
             <button onClick={onBack} style={iconBtn}><ChevronLeft size={20} color="#fff"/></button>
             <Shield size={18} color="#fff"/><span style={{...head,fontWeight:700,fontSize:18,color:"#fff"}}>Pannello Admin</span>
