@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Bell, Home, Calendar, MessageSquare, User, MapPin, Check, X, Clock, Trophy,
-  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap, BarChart3, Lock
+  ChevronRight, ChevronLeft, LogOut, Shield, Users, Search, Plus, Play, Loader2, Pencil, Trash2, Download, Gift, Star, Wallet, FileText, Heart, Coffee, Sparkles, GraduationCap, BarChart3, Lock, Image as ImageIcon
 } from "lucide-react";
 import { supabase, SUPA_URL } from "./supabase.js";
 
@@ -377,7 +377,8 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
       </div>}
 
       <SectionHead Ic={Play} title="Aftermovie Estate 2026"/>
-      <button onClick={()=>{ const u=(impost||{}).aftermovie_url; if(u) window.open(u,"_blank"); }} style={{position:"relative",width:"100%",height:desktop?240:186,borderRadius:20,overflow:"hidden",marginBottom:26,background:"linear-gradient(125deg,#7170F1 0%,#255FF0 45%,#18C7D0 100%)",border:"none",padding:0,cursor:(impost&&impost.aftermovie_url)?"pointer":"default",display:"block"}}>
+      <button onClick={()=>{ const u=(impost||{}).aftermovie_url; if(u) window.open(u,"_blank"); }} style={{position:"relative",width:"100%",height:desktop?240:186,borderRadius:20,overflow:"hidden",marginBottom:26,background:(impost&&impost.aftermovie_cover)?("url("+supabase.storage.from("media").getPublicUrl(impost.aftermovie_cover).data.publicUrl+") center/cover"):"linear-gradient(125deg,#7170F1 0%,#255FF0 45%,#18C7D0 100%)",border:"none",padding:0,cursor:(impost&&impost.aftermovie_url)?"pointer":"default",display:"block"}}>
+        {(impost&&impost.aftermovie_cover)?<div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,rgba(0,0,0,0.55),rgba(0,0,0,0.1))"}}/>:null}
         <div style={{position:"absolute",left:22,top:0,bottom:0,display:"flex",alignItems:"center",maxWidth:"58%"}}>
           <span style={{...head,color:"#fff",fontWeight:900,fontSize:desktop?32:23,lineHeight:1.03,textAlign:"left"}}>{((impost&&impost.aftermovie_titolo)||"Rivivi la nostra estate").toUpperCase()}</span>
         </div>
@@ -391,7 +392,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         : <div style={{display:"flex",gap:13,overflowX:"auto",paddingBottom:8,marginBottom:26}}>
             {upcoming.map(e=>{ const cat=CAT[e.categoria]||CAT.NOTTE_EVENTO; const dt=dd(e.inizio); return (
               <button key={e.id} onClick={()=>open(e.id)} style={{flex:"0 0 232px",textAlign:"left",cursor:"pointer",background:C.surface,border:`1px solid ${C.border}`,borderRadius:16,padding:0,overflow:"hidden"}}>
-                <div style={{height:98,background:`linear-gradient(135deg,${cat.color},${C.accent})`,position:"relative"}}>
+                <div style={{height:98,background:e.cover_url?`url(${supabase.storage.from("media").getPublicUrl(e.cover_url).data.publicUrl}) center/cover`:`linear-gradient(135deg,${cat.color},${C.accent})`,position:"relative"}}>
                   <div style={{position:"absolute",top:10,left:10,background:"#fff",borderRadius:11,padding:"5px 0",textAlign:"center",minWidth:48,boxShadow:"0 4px 10px rgba(0,0,0,0.14)"}}>
                     <div style={{...head,fontSize:18,fontWeight:900,color:C.primary,lineHeight:1}}>{dt[0]}</div>
                     <div style={{fontSize:9,fontWeight:800,color:C.primary,letterSpacing:.5}}>{dt[1]}</div>
@@ -414,7 +415,7 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:26}}>
           {novita.map((n,i)=>{ const col=i%2?C.primary:C.accent; return (
             <button key={n.id} onClick={()=>setNovOpen(n)} style={{...card,padding:0,overflow:"hidden",display:"flex",alignItems:"stretch",textAlign:"left",cursor:"pointer"}}>
-              <div style={{width:92,flexShrink:0,background:`linear-gradient(135deg,${col},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center"}}><Sparkles size={26} color="#fff"/></div>
+              <div style={{width:92,flexShrink:0,background:n.cover_url?`url(${supabase.storage.from("media").getPublicUrl(n.cover_url).data.publicUrl}) center/cover`:`linear-gradient(135deg,${col},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center"}}>{!n.cover_url && <Sparkles size={26} color="#fff"/>}</div>
               <div style={{flex:1,padding:"13px 15px",minWidth:0}}>
                 <span style={{fontSize:10,fontWeight:800,color:"#fff",background:col,borderRadius:999,padding:"3px 10px",textTransform:"uppercase",letterSpacing:.5}}>{n.tag||"Novità"}</span>
                 <div style={{...head,fontSize:17,fontWeight:800,margin:"8px 0 3px"}}>{n.titolo}</div>
@@ -871,7 +872,7 @@ function AdminComunicazioni({ me }){
   const [counts,setCounts]=useState({}); const [confBy,setConfBy]=useState({}); const [staffNames,setStaffNames]=useState({}); const [confOpen,setConfOpen]=useState(null);
   const [nov,setNov]=useState(null);
   const [editingN,setEditingN]=useState(null);
-  const [af,setAf]=useState({aftermovie_url:"",aftermovie_titolo:""}); const [afMsg,setAfMsg]=useState("");
+  const [af,setAf]=useState({aftermovie_url:"",aftermovie_titolo:"",aftermovie_cover:null}); const [afMsg,setAfMsg]=useState("");
   const [vita,setVita]=useState(null); const [editingV,setEditingV]=useState(null);
   async function load(){
     const { data }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
@@ -880,14 +881,14 @@ function AdminComunicazioni({ me }){
     const c={}; const cb={}; (le||[]).forEach(x=>{ if(x.confermata_at){ c[x.comunicazione_id]=(c[x.comunicazione_id]||0)+1; (cb[x.comunicazione_id]=cb[x.comunicazione_id]||[]).push(x.staff_id); } }); setCounts(c); setConfBy(cb);
     const { data:stn }=await supabase.from("staff_anagrafica").select("id,nome,cognome"); const sm={}; (stn||[]).forEach(x=>sm[x.id]=x.nome+" "+x.cognome); setStaffNames(sm);
     const { data:nv }=await supabase.from("novita").select("*").order("created_at",{ascending:false}); setNov(nv||[]);
-    const { data:imp }=await supabase.from("impostazioni").select("key,value"); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setAf({aftermovie_url:im.aftermovie_url||"",aftermovie_titolo:im.aftermovie_titolo||""});
+    const { data:imp }=await supabase.from("impostazioni").select("key,value"); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setAf({aftermovie_url:im.aftermovie_url||"",aftermovie_titolo:im.aftermovie_titolo||"",aftermovie_cover:im.aftermovie_cover||null});
     const { data:vs }=await supabase.from("vita_staff").select("*").order("ordine"); setVita(vs||[]);
   }
   useEffect(()=>{ load(); },[]);
   async function del(id){ if(!window.confirm("Eliminare questa comunicazione?")) return; await supabase.from("comunicazioni").delete().eq("id",id); load(); }
   async function delN(id){ if(!window.confirm("Eliminare questa novità?")) return; await supabase.from("novita").delete().eq("id",id); load(); }
   async function delV(id){ if(!window.confirm("Eliminare questa tessera?")) return; await supabase.from("vita_staff").delete().eq("id",id); load(); }
-  async function saveAf(){ await supabase.from("impostazioni").upsert([{key:"aftermovie_url",value:af.aftermovie_url.trim()||null},{key:"aftermovie_titolo",value:af.aftermovie_titolo.trim()||null}],{onConflict:"key"}); setAfMsg("Salvato"); setTimeout(()=>setAfMsg(""),2000); }
+  async function saveAf(){ await supabase.from("impostazioni").upsert([{key:"aftermovie_url",value:af.aftermovie_url.trim()||null},{key:"aftermovie_titolo",value:af.aftermovie_titolo.trim()||null},{key:"aftermovie_cover",value:af.aftermovie_cover||null}],{onConflict:"key"}); setAfMsg("Salvato"); setTimeout(()=>setAfMsg(""),2000); }
   return (
     <div>
       <div style={{...card,marginBottom:20}}>
@@ -896,6 +897,8 @@ function AdminComunicazioni({ me }){
         <input value={af.aftermovie_url} onChange={e=>setAf(a=>({...a,aftermovie_url:e.target.value}))} placeholder="https://..." style={inp}/>
         <label style={lbl}>Titolo mostrato</label>
         <input value={af.aftermovie_titolo} onChange={e=>setAf(a=>({...a,aftermovie_titolo:e.target.value}))} placeholder="Rivivi l'estate" style={inp}/>
+        <label style={lbl}>Copertina (immagine di sfondo)</label>
+        <CoverField value={af.aftermovie_cover} onChange={v=>setAf(a=>({...a,aftermovie_cover:v}))}/>
         <div style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}>
           <button onClick={saveAf} style={{...btnPrimary,padding:"9px 16px"}}>Salva aftermovie</button>
           {afMsg && <span style={{color:C.success,fontSize:13,fontWeight:700}}>{afMsg}</span>}
@@ -1042,13 +1045,13 @@ function VitaForm({ item, onClose, onSaved }){
 
 function NovitaForm({ nov, onClose, onSaved }){
   const isEdit=!!nov.id;
-  const [f,setF]=useState({tag:nov.tag||"",titolo:nov.titolo||"",corpo:nov.corpo||"",attivo:nov.id?!!nov.attivo:true});
+  const [f,setF]=useState({tag:nov.tag||"",titolo:nov.titolo||"",corpo:nov.corpo||"",attivo:nov.id?!!nov.attivo:true,cover_url:nov.cover_url||null});
   const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const ok=f.titolo.trim();
   async function save(){
     if(!ok||busy) return; setBusy(true); setErr("");
-    const payload={tag:f.tag.trim()||null,titolo:f.titolo.trim(),corpo:f.corpo.trim()||null,attivo:f.attivo};
+    const payload={tag:f.tag.trim()||null,titolo:f.titolo.trim(),corpo:f.corpo.trim()||null,attivo:f.attivo,cover_url:f.cover_url||null};
     let error;
     if(isEdit){ ({ error }=await supabase.from("novita").update(payload).eq("id",nov.id)); }
     else { ({ error }=await supabase.from("novita").insert(payload)); }
@@ -1069,6 +1072,8 @@ function NovitaForm({ nov, onClose, onSaved }){
         <input value={f.titolo} onChange={e=>set("titolo",e.target.value)} placeholder="Es. Aperte le iscrizioni al Reunion" style={inp}/>
         <label style={lbl}>Testo</label>
         <textarea value={f.corpo} onChange={e=>set("corpo",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
+        <label style={lbl}>Copertina (foto)</label>
+        <CoverField value={f.cover_url} onChange={v=>set("cover_url",v)}/>
         <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
           <input type="checkbox" checked={f.attivo} onChange={e=>set("attivo",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
           <span style={{fontSize:13.5,color:C.text}}>Mostra in Home</span>
@@ -1478,6 +1483,8 @@ function PremioForm({ premio, onClose, onSaved }){
         <input value={f.nome} onChange={e=>set("nome",e.target.value)} placeholder="Es. Ingresso omaggio" style={inp}/>
         <label style={lbl}>Descrizione</label>
         <textarea value={f.descrizione} onChange={e=>set("descrizione",e.target.value)} rows={3} style={{...inp,resize:"vertical"}}/>
+        <label style={lbl}>Copertina (foto)</label>
+        <CoverField value={f.cover_url} onChange={v=>set("cover_url",v)}/>
         <label style={lbl}>Punti per sbloccarlo</label>
         <input type="number" value={f.costo_punti} onChange={e=>set("costo_punti",e.target.value)} style={inp}/>
         <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
@@ -1851,15 +1858,33 @@ function AdminStats(){
   );
 }
 
+function CoverField({ value, onChange }){
+  const ref=useRef(); const [up,setUp]=useState(false);
+  const url=value?supabase.storage.from("media").getPublicUrl(value).data.publicUrl:null;
+  async function pick(e){ const file=e.target.files[0]; if(!file) return; setUp(true); const ext=(file.name.split(".").pop()||"jpg").toLowerCase(); const path="cover_"+Date.now()+"."+ext; const upr=await supabase.storage.from("media").upload(path,file,{upsert:true,contentType:file.type||"image/jpeg"}); setUp(false); if(!upr.error){ onChange(path); } if(e.target) e.target.value=""; }
+  return (
+    <div style={{marginBottom:6}}>
+      <div style={{width:"100%",height:120,borderRadius:12,overflow:"hidden",background:url?"#000":C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",marginBottom:8,border:`1px solid ${C.border}`}}>
+        {url?<img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<ImageIcon size={26} color={C.primary}/>}
+      </div>
+      <input ref={ref} type="file" accept="image/*" onChange={pick} style={{display:"none"}}/>
+      <div style={{display:"flex",gap:8}}>
+        <button type="button" onClick={()=>ref.current&&ref.current.click()} disabled={up} style={{...btnGhost,fontSize:13,padding:"7px 12px"}}>{up?"Carico…":(value?"Cambia":"Carica copertina")}</button>
+        {value && <button type="button" onClick={()=>onChange(null)} style={{...btnGhost,fontSize:13,padding:"7px 12px",color:"#d33"}}>Rimuovi</button>}
+      </div>
+    </div>
+  );
+}
+
 function EventForm({ me, ev, onClose, onSaved }){
   const isEdit=!!ev.id;
-  const [f,setF]=useState({titolo:ev.titolo||"",categoria:ev.categoria||"NOTTE_EVENTO",inizio:ev.inizio?toLocalInput(ev.inizio):"",luogo:ev.luogo||"",zona:ev.zona||"",descrizione:ev.descrizione||"",punti:(ev.punti!=null?ev.punti:10)});
+  const [f,setF]=useState({titolo:ev.titolo||"",categoria:ev.categoria||"NOTTE_EVENTO",inizio:ev.inizio?toLocalInput(ev.inizio):"",luogo:ev.luogo||"",zona:ev.zona||"",descrizione:ev.descrizione||"",punti:(ev.punti!=null?ev.punti:10),cover_url:ev.cover_url||null});
   const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const ok=f.titolo.trim()&&f.categoria;
   async function save(){
     if(!ok||busy) return; setBusy(true); setErr("");
-    const payload={titolo:f.titolo.trim(),categoria:f.categoria,inizio:f.inizio?new Date(f.inizio).toISOString():null,luogo:f.luogo.trim()||null,zona:f.zona.trim()||null,descrizione:f.descrizione.trim()||null,punti:(f.punti===""||f.punti==null)?10:(parseInt(f.punti)||10)};
+    const payload={titolo:f.titolo.trim(),categoria:f.categoria,inizio:f.inizio?new Date(f.inizio).toISOString():null,luogo:f.luogo.trim()||null,zona:f.zona.trim()||null,descrizione:f.descrizione.trim()||null,punti:(f.punti===""||f.punti==null)?10:(parseInt(f.punti)||10),cover_url:f.cover_url||null};
     let error;
     if(isEdit){ ({ error }=await supabase.from("eventi").update(payload).eq("id",ev.id)); }
     else { ({ error }=await supabase.from("eventi").insert({...payload,created_by:me.id})); }
