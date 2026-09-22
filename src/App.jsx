@@ -793,7 +793,7 @@ function ValutaStaff({ ev, staff, existing, onClose, onSaved }){
 function AdminComunicazioni({ me }){
   const [rows,setRows]=useState(null);
   const [editing,setEditing]=useState(null);
-  const [counts,setCounts]=useState({});
+  const [counts,setCounts]=useState({}); const [confBy,setConfBy]=useState({}); const [staffNames,setStaffNames]=useState({}); const [confOpen,setConfOpen]=useState(null);
   const [nov,setNov]=useState(null);
   const [editingN,setEditingN]=useState(null);
   const [af,setAf]=useState({aftermovie_url:"",aftermovie_titolo:""}); const [afMsg,setAfMsg]=useState("");
@@ -801,8 +801,9 @@ function AdminComunicazioni({ me }){
   async function load(){
     const { data }=await supabase.from("comunicazioni").select("*").order("created_at",{ascending:false});
     setRows(data||[]);
-    const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,confermata_at");
-    const c={}; (le||[]).forEach(x=>{ if(x.confermata_at) c[x.comunicazione_id]=(c[x.comunicazione_id]||0)+1; }); setCounts(c);
+    const { data:le }=await supabase.from("comunicazioni_letture").select("comunicazione_id,staff_id,confermata_at");
+    const c={}; const cb={}; (le||[]).forEach(x=>{ if(x.confermata_at){ c[x.comunicazione_id]=(c[x.comunicazione_id]||0)+1; (cb[x.comunicazione_id]=cb[x.comunicazione_id]||[]).push(x.staff_id); } }); setCounts(c); setConfBy(cb);
+    const { data:stn }=await supabase.from("staff_anagrafica").select("id,nome,cognome"); const sm={}; (stn||[]).forEach(x=>sm[x.id]=x.nome+" "+x.cognome); setStaffNames(sm);
     const { data:nv }=await supabase.from("novita").select("*").order("created_at",{ascending:false}); setNov(nv||[]);
     const { data:imp }=await supabase.from("impostazioni").select("key,value"); const im={}; (imp||[]).forEach(x=>im[x.key]=x.value); setAf({aftermovie_url:im.aftermovie_url||"",aftermovie_titolo:im.aftermovie_titolo||""});
     const { data:vs }=await supabase.from("vita_staff").select("*").order("ordine"); setVita(vs||[]);
@@ -840,7 +841,7 @@ function AdminComunicazioni({ me }){
                   {c.richiede_conferma && <span style={{fontSize:10,fontWeight:700,color:C.amber,background:C.amberSoft,borderRadius:6,padding:"2px 7px"}}>CONFERMA</span>}
                 </div>
                 {c.corpo && <p style={{margin:"0 0 5px",fontSize:13,color:C.mut,lineHeight:1.45}}>{c.corpo}</p>}
-                <span style={{fontSize:11.5,color:C.mut}}>{fdate(c.created_at)}{c.richiede_conferma?` · confermata da ${counts[c.id]||0}`:""}</span>
+                <span style={{fontSize:11.5,color:C.mut}}>{fdate(c.created_at)}{c.richiede_conferma && <> · <button onClick={()=>setConfOpen(c.id)} style={{border:"none",background:"transparent",padding:0,cursor:"pointer",color:C.primary,fontWeight:700,fontSize:11.5,fontFamily:"Barlow"}}>confermata da {counts[c.id]||0} ›</button></>}</span>
               </div>
               <button onClick={()=>setEditing(c)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={17}/></button>
               <button onClick={()=>del(c.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
@@ -893,6 +894,20 @@ function AdminComunicazioni({ me }){
               <button onClick={()=>delV(v.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={17}/></button>
             </div>); })}
          </div>}
+      {confOpen && (
+        <div onMouseDown={e=>{ if(e.target===e.currentTarget) setConfOpen(null); }} style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:420,margin:"24px 0",padding:20,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <h3 style={{...head,fontSize:19,fontWeight:800,margin:0}}>Chi ha confermato ({(confBy[confOpen]||[]).length})</h3>
+              <button onClick={()=>setConfOpen(null)} style={iconBtn}><X size={22} color={C.mut}/></button>
+            </div>
+            <div style={{overflowY:"auto"}}>
+              {(confBy[confOpen]||[]).length===0 ? <span style={{color:C.mut,fontSize:13}}>Ancora nessuno.</span>
+               : (confBy[confOpen]||[]).map((sid,i)=><div key={sid} style={{padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none",fontSize:14,fontWeight:600}}>{staffNames[sid]||"—"}</div>)}
+            </div>
+          </div>
+        </div>
+      )}
       {editing!==null && <ComForm me={me} com={editing} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
       {editingN!==null && <NovitaForm nov={editingN} onClose={()=>setEditingN(null)} onSaved={()=>{setEditingN(null);load();}}/>}
       {editingV!==null && <VitaForm item={editingV} onClose={()=>setEditingV(null)} onSaved={()=>{setEditingV(null);load();}}/>}
@@ -1794,12 +1809,15 @@ function VitaModal({ item, onClose }){
 }
 
 function News({ tag, color, title, body, time }){ return (
-  <div style={{...card,display:"flex",gap:12}}>
-    <div style={{width:4,alignSelf:"stretch",background:color,borderRadius:3,flexShrink:0}}/>
-    <div style={{flex:1}}><span style={{fontSize:10.5,fontWeight:700,color,textTransform:"uppercase",letterSpacing:.4}}>{tag}</span>
-      <div style={{...head,fontSize:17,fontWeight:700,margin:"2px 0 4px"}}>{title}</div>
-      <p style={{margin:0,fontSize:13,color:C.mut,lineHeight:1.45}}>{body}</p>
-      <span style={{fontSize:11.5,color:C.mut,display:"block",marginTop:6}}>{time}</span></div></div>); }
+  <div style={{...card,padding:0,overflow:"hidden"}}>
+    <div style={{height:5,background:`linear-gradient(90deg,${color},${C.accent})`}}/>
+    <div style={{padding:"14px 16px"}}>
+      <span style={{fontSize:10,fontWeight:800,color:"#fff",background:color,borderRadius:999,padding:"3px 11px",textTransform:"uppercase",letterSpacing:.6}}>{tag}</span>
+      <div style={{...head,fontSize:18.5,fontWeight:800,margin:"10px 0 4px",lineHeight:1.12}}>{title}</div>
+      <p style={{margin:0,fontSize:13.5,color:C.mut,lineHeight:1.45}}>{body}</p>
+      {time && <div style={{fontSize:11,color:C.mut,marginTop:8,fontWeight:600}}>{time}</div>}
+    </div>
+  </div>); }
 function BigStat({ n, l, Ic, col }){ return (
   <div style={{flex:1,minWidth:150,...card,display:"flex",alignItems:"center",gap:13}}>
     <div style={{width:42,height:42,borderRadius:12,background:col+"22",display:"flex",alignItems:"center",justifyContent:"center"}}><Ic size={20} color={col}/></div>
