@@ -1496,106 +1496,185 @@ function PremioForm({ premio, onClose, onSaved }){
 }
 
 function AdminEconomia(){
-  const [rows,setRows]=useState(null); const [eventi,setEventi]=useState([]); const [editing,setEditing]=useState(null); const [filter,setFilter]=useState("tutti");
+  const [promo,setPromo]=useState(null); const [voci,setVoci]=useState({}); const [cash,setCash]=useState([]);
+  const [editP,setEditP]=useState(null); const [editV,setEditV]=useState(null); const [editC,setEditC]=useState(null);
   async function load(){
-    const { data }=await supabase.from("economia").select("*").order("created_at",{ascending:false}); setRows(data||[]);
-    const { data:ev }=await supabase.from("eventi").select("id,titolo").order("inizio",{ascending:false}); setEventi(ev||[]);
+    const { data:p }=await supabase.from("eco_promo").select("*").order("data",{ascending:false,nullsFirst:false}); setPromo(p||[]);
+    const { data:v }=await supabase.from("eco_voce").select("*").order("ordine").order("created_at"); const vm={}; (v||[]).forEach(x=>{ (vm[x.promo_id]=vm[x.promo_id]||[]).push(x); }); setVoci(vm);
+    const { data:c }=await supabase.from("eco_cash").select("*").order("created_at"); setCash(c||[]);
   }
   useEffect(()=>{ load(); },[]);
-  async function del(id){ if(!window.confirm("Eliminare questa voce?")) return; await supabase.from("economia").delete().eq("id",id); load(); }
-  async function toggleSaldato(r){ await supabase.from("economia").update({saldato:!r.saldato}).eq("id",r.id); load(); }
-  const evName=id=>{ const e=eventi.find(x=>x.id===id); return e?e.titolo:null; };
   const eur=n=>"€ "+Number(n||0).toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const all=rows||[];
-  const entrate=all.filter(r=>r.tipo==="entrata").reduce((a,r)=>a+Number(r.importo||0),0);
-  const uscite=all.filter(r=>r.tipo==="uscita").reduce((a,r)=>a+Number(r.importo||0),0);
-  const daIncassare=all.filter(r=>r.chi_deve && !r.saldato).reduce((a,r)=>a+Number(r.importo||0),0);
-  const list=all.filter(r=> filter==="dasaldare"?(r.chi_deve && !r.saldato) : filter==="entrate"?r.tipo==="entrata" : filter==="uscite"?r.tipo==="uscita" : true);
+  const dt=v=>v?new Date(v).toLocaleDateString("it-IT"):"—";
+  async function delP(id){ if(!window.confirm("Eliminare questa promo e tutte le sue voci?")) return; await supabase.from("eco_promo").delete().eq("id",id); load(); }
+  async function delV(id){ await supabase.from("eco_voce").delete().eq("id",id); load(); }
+  async function delC(id){ if(!window.confirm("Eliminare questa voce cash?")) return; await supabase.from("eco_cash").delete().eq("id",id); load(); }
+  async function cycleVoce(v){ const order=["pagato","da_pagare","no_nota_spesa"]; const next=order[(order.indexOf(v.stato)+1)%3]; await supabase.from("eco_voce").update({stato:next}).eq("id",v.id); load(); }
+  async function cycleCash(c){ const next=c.stato==="da_ritirare"?"ritiro_in_pari":"da_ritirare"; await supabase.from("eco_cash").update({stato:next}).eq("id",c.id); load(); }
+  const all=promo||[];
+  const bilancio=all.reduce((a,p)=>a+Number(p.chiusura_cassa||0),0);
+  const cashRitirare=(cash||[]).filter(c=>c.stato==="da_ritirare").reduce((a,c)=>a+Number(c.importo||0),0);
+  const statoV={pagato:["Pagato",C.success,C.successSoft],da_pagare:["Da pagare","#d33","#fdecec"],no_nota_spesa:["No nota spesa",C.mut,"#eef1f6"]};
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-        <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>Economia</h2>
-        <button onClick={()=>setEditing({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuova voce</button>
+      <h2 style={{...head,fontSize:22,fontWeight:800,margin:"0 0 14px"}}>Economia</h2>
+      <div style={{display:"flex",gap:10,marginBottom:20,flexWrap:"wrap"}}>
+        <BigStat n={(bilancio>=0?"+":"")+eur(bilancio)} l="Bilancio season" Ic={Wallet} col={bilancio>=0?C.success:"#d33"}/>
+        <BigStat n={eur(cashRitirare)} l="Cash da ritirare" Ic={Wallet} col={C.amber}/>
+        <BigStat n={all.length} l="Promo" Ic={Calendar} col={C.primary}/>
       </div>
-      <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
-        <BigStat n={eur(entrate)} l="Entrate" Ic={Wallet} col={C.success}/>
-        <BigStat n={eur(uscite)} l="Uscite" Ic={Wallet} col={"#d33"}/>
-        <BigStat n={eur(entrate-uscite)} l="Saldo" Ic={Wallet} col={C.primary}/>
-        <BigStat n={eur(daIncassare)} l="Da incassare" Ic={Wallet} col={C.amber}/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+        <h3 style={{...sect,marginTop:0,flex:1}}>Promo / Eventi</h3>
+        <button onClick={()=>setEditP({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuova promo</button>
       </div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-        {[["tutti","Tutte"],["entrate","Entrate"],["uscite","Uscite"],["dasaldare","Da saldare"]].map(([k,l])=>{ const on=filter===k; return <button key={k} onClick={()=>setFilter(k)} style={{border:`1px solid ${on?C.primary:C.border}`,background:on?C.primarySoft:C.surface,color:on?C.primary:C.mut,borderRadius:999,padding:"6px 12px",fontSize:12.5,fontWeight:700,cursor:"pointer",fontFamily:"Barlow"}}>{l}</button>; })}
-      </div>
-      {rows===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
-       : list.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessuna voce. Aggiungine una.</div>
-       : <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {list.map(r=>(
-            <div key={r.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",borderLeft:`4px solid ${r.tipo==="entrata"?C.success:"#d33"}`}}>
-              <div style={{flex:1,minWidth:160}}>
-                <div style={{fontWeight:700,fontSize:15}}>{r.voce}</div>
-                <div style={{fontSize:12,color:C.mut,marginTop:2}}>
-                  {r.tipo==="entrata"?"Entrata":"Uscita"}{evName(r.evento_id)?` · ${evName(r.evento_id)}`:""}{r.chi_deve?` · Deve dare: ${r.chi_deve}`:""}
+      {promo===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : all.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessuna promo. Aggiungine una.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          {all.map(p=>{ const vv=voci[p.id]||[]; return (
+            <div key={p.id} style={{...card,padding:0,overflow:"hidden"}}>
+              <div style={{padding:"14px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"flex-start",gap:10,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:150}}>
+                  <div style={{...head,fontSize:18,fontWeight:800}}>{p.luogo||"—"}</div>
+                  <div style={{fontSize:12.5,color:C.mut,marginTop:2}}>{dt(p.data)} · Cachet: {eur(p.cachet_disposizione)}</div>
+                  {p.note && <div style={{fontSize:12,color:C.mut,marginTop:2}}>{p.note}</div>}
                 </div>
-                {r.note && <div style={{fontSize:12,color:C.mut,marginTop:2}}>{r.note}</div>}
+                {p.chiusura_cassa!=null && <div style={{textAlign:"right"}}><div style={{fontSize:10,color:C.mut,fontWeight:700,letterSpacing:.4}}>CHIUSURA</div><div style={{...head,fontWeight:800,fontSize:17,color:Number(p.chiusura_cassa)>=0?C.success:"#d33"}}>{Number(p.chiusura_cassa)>=0?"+":""}{eur(p.chiusura_cassa)}</div></div>}
+                <button onClick={()=>setEditP(p)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={16}/></button>
+                <button onClick={()=>delP(p.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={16}/></button>
               </div>
-              <div style={{...head,fontWeight:800,fontSize:16,color:r.tipo==="entrata"?C.success:"#d33"}}>{r.tipo==="entrata"?"+":"−"}{eur(r.importo)}</div>
-              {r.chi_deve && <button onClick={()=>toggleSaldato(r)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"6px 11px",fontFamily:"Barlow",fontWeight:700,fontSize:12,background:r.saldato?C.successSoft:C.amberSoft,color:r.saldato?C.success:C.amber}}>{r.saldato?"Saldato":"Da saldare"}</button>}
-              <button onClick={()=>setEditing(r)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={16}/></button>
-              <button onClick={()=>del(r.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={16}/></button>
-            </div>))}
+              <div style={{padding:"4px 16px 12px"}}>
+                {vv.map((v,vi)=>{ const st=statoV[v.stato]||statoV.da_pagare; return (
+                    <div key={v.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderTop:vi?`1px solid ${C.border}`:"none"}}>
+                      <span style={{...head,fontWeight:800,fontSize:14,minWidth:70}}>{eur(v.importo)}</span>
+                      <span style={{flex:1,fontSize:13,minWidth:0}}>{v.descrizione}</span>
+                      <button onClick={()=>cycleVoce(v)} title="Cambia stato" style={{border:"none",cursor:"pointer",borderRadius:7,padding:"4px 9px",fontSize:11,fontWeight:700,color:st[1],background:st[2],whiteSpace:"nowrap"}}>{st[0]}</button>
+                      <button onClick={()=>setEditV({promoId:p.id,voce:v})} style={{...iconBtn,color:C.primary,padding:4}}><Pencil size={14}/></button>
+                      <button onClick={()=>delV(v.id)} style={{...iconBtn,color:"#d33",padding:4}}><Trash2 size={14}/></button>
+                    </div>); })}
+                <button onClick={()=>setEditV({promoId:p.id,voce:{}})} style={{...btnGhost,marginTop:10,fontSize:12.5,padding:"7px 12px",display:"inline-flex",alignItems:"center",gap:5}}><Plus size={14}/> Aggiungi voce</button>
+              </div>
+            </div>); })}
          </div>}
-      {editing!==null && <EconForm voce={editing} eventi={eventi} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);load();}}/>}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginTop:26,marginBottom:12}}>
+        <h3 style={{...sect,marginTop:0,flex:1}}>Cash per Invibe</h3>
+        <button onClick={()=>setEditC({})} style={{...btnPrimary,display:"flex",alignItems:"center",gap:6,padding:"9px 14px"}}><Plus size={16}/> Nuovo</button>
+      </div>
+      {(cash||[]).length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessuna voce.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {cash.map(c=>{ const par=c.stato==="ritiro_in_pari"; return (
+            <div key={c.id} style={{...card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+              <div style={{flex:1,minWidth:140}}><div style={{fontWeight:700,fontSize:14}}>{c.persona||"—"}</div>{c.nota && <div style={{fontSize:12,color:C.mut}}>{c.nota}</div>}</div>
+              <span style={{...head,fontWeight:800,fontSize:15}}>{eur(c.importo)}</span>
+              <button onClick={()=>cycleCash(c)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"6px 11px",fontSize:12,fontWeight:700,color:par?C.success:"#d33",background:par?C.successSoft:"#fdecec",whiteSpace:"nowrap"}}>{par?"Ritiro in pari":"Da ritirare"}</button>
+              <button onClick={()=>setEditC(c)} style={{...iconBtn,color:C.primary,padding:6}}><Pencil size={16}/></button>
+              <button onClick={()=>delC(c.id)} style={{...iconBtn,color:"#d33",padding:6}}><Trash2 size={16}/></button>
+            </div>); })}
+         </div>}
+      {editP!==null && <PromoForm promo={editP} onClose={()=>setEditP(null)} onSaved={()=>{setEditP(null);load();}}/>}
+      {editV!==null && <VoceForm data={editV} onClose={()=>setEditV(null)} onSaved={()=>{setEditV(null);load();}}/>}
+      {editC!==null && <CashForm cash={editC} onClose={()=>setEditC(null)} onSaved={()=>{setEditC(null);load();}}/>}
     </div>
   );
 }
 
-function EconForm({ voce, eventi, onClose, onSaved }){
-  const isEdit=!!voce.id;
-  const [f,setF]=useState({voce:voce.voce||"",tipo:voce.tipo||"uscita",importo:(voce.importo!=null?voce.importo:""),evento_id:voce.evento_id||"",chi_deve:voce.chi_deve||"",note:voce.note||"",saldato:!!voce.saldato});
-  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
-  const set=(k,v)=>setF(o=>({...o,[k]:v}));
-  const ok=f.voce.trim();
-  async function save(){
-    if(!ok||busy) return; setBusy(true); setErr("");
-    const payload={voce:f.voce.trim(),tipo:f.tipo,importo:(f.importo===""||f.importo==null)?0:Number(f.importo)||0,evento_id:f.evento_id||null,chi_deve:f.chi_deve.trim()||null,note:f.note.trim()||null,saldato:f.saldato};
-    let error;
-    if(isEdit){ ({ error }=await supabase.from("economia").update(payload).eq("id",voce.id)); }
-    else { ({ error }=await supabase.from("economia").insert(payload)); }
-    setBusy(false);
-    if(error){ setErr(error.message); return; }
-    onSaved();
-  }
+function EcoModal({ title, onClose, children }){
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{isEdit?"Modifica voce":"Nuova voce"}</h3>
-          <button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button>
-        </div>
-        <label style={lbl}>Voce *</label>
-        <input value={f.voce} onChange={e=>set("voce",e.target.value)} placeholder="Es. Sponsor serata / Rimborso benzina" style={inp}/>
-        <label style={lbl}>Tipo</label>
-        <select value={f.tipo} onChange={e=>set("tipo",e.target.value)} style={inp}><option value="entrata">Entrata</option><option value="uscita">Uscita</option></select>
-        <label style={lbl}>Importo (€)</label>
-        <input type="number" step="0.01" value={f.importo} onChange={e=>set("importo",e.target.value)} style={inp}/>
-        <label style={lbl}>Evento collegato (facoltativo)</label>
-        <select value={f.evento_id} onChange={e=>set("evento_id",e.target.value)} style={inp}><option value="">—</option>{eventi.map(e=><option key={e.id} value={e.id}>{e.titolo}</option>)}</select>
-        <label style={lbl}>Chi deve dare i soldi (facoltativo)</label>
-        <input value={f.chi_deve} onChange={e=>set("chi_deve",e.target.value)} placeholder="Nome / locale / sponsor" style={inp}/>
-        <label style={lbl}>Note</label>
-        <textarea value={f.note} onChange={e=>set("note",e.target.value)} rows={2} style={{...inp,resize:"vertical"}}/>
-        <label style={{display:"flex",alignItems:"center",gap:9,marginTop:14,cursor:"pointer"}}>
-          <input type="checkbox" checked={f.saldato} onChange={e=>set("saldato",e.target.checked)} style={{width:18,height:18,accentColor:C.primary}}/>
-          <span style={{fontSize:13.5,color:C.text}}>Già saldato / incassato</span>
-        </label>
-        {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
-        <div style={{display:"flex",gap:8,marginTop:14}}>
-          <button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button>
-          <button onClick={save} disabled={!ok||busy} style={{...btnPrimary,flex:1,opacity:(!ok||busy)?.55:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Aggiungi"}</button>
-        </div>
-        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{title}</h3><button onClick={onClose} style={iconBtn}><X size={20} color={C.mut}/></button></div>
+        {children}
       </div>
     </div>
+  );
+}
+
+function PromoForm({ promo, onClose, onSaved }){
+  const isEdit=!!promo.id;
+  const [f,setF]=useState({data:promo.data||"",luogo:promo.luogo||"",cachet_disposizione:(promo.cachet_disposizione!=null?promo.cachet_disposizione:""),chiusura_cassa:(promo.chiusura_cassa!=null?promo.chiusura_cassa:""),note:promo.note||""});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  async function save(){
+    if(busy) return; setBusy(true); setErr("");
+    const payload={data:f.data||null,luogo:f.luogo.trim()||null,cachet_disposizione:(f.cachet_disposizione===""||f.cachet_disposizione==null)?0:Number(f.cachet_disposizione)||0,chiusura_cassa:(f.chiusura_cassa===""||f.chiusura_cassa==null)?null:Number(f.chiusura_cassa),note:f.note.trim()||null};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("eco_promo").update(payload).eq("id",promo.id)); }
+    else { ({ error }=await supabase.from("eco_promo").insert(payload)); }
+    setBusy(false); if(error){ setErr(error.message); return; } onSaved();
+  }
+  return (
+    <EcoModal title={isEdit?"Modifica promo":"Nuova promo"} onClose={onClose}>
+      <label style={lbl}>Data</label>
+      <input type="date" value={f.data} onChange={e=>set("data",e.target.value)} style={inp}/>
+      <label style={lbl}>Luogo</label>
+      <input value={f.luogo} onChange={e=>set("luogo",e.target.value)} placeholder="Es. NUTS Park Viareggio" style={inp}/>
+      <label style={lbl}>Cachet a disposizione (€)</label>
+      <input type="number" step="0.01" value={f.cachet_disposizione} onChange={e=>set("cachet_disposizione",e.target.value)} style={inp}/>
+      <label style={lbl}>Chiusura di cassa (€ — ricavo positivo, perdita negativa)</label>
+      <input type="number" step="0.01" value={f.chiusura_cassa} onChange={e=>set("chiusura_cassa",e.target.value)} placeholder="lascia vuoto se non chiusa" style={inp}/>
+      <label style={lbl}>Note</label>
+      <textarea value={f.note} onChange={e=>set("note",e.target.value)} rows={2} style={{...inp,resize:"vertical"}}/>
+      {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+      <div style={{display:"flex",gap:8,marginTop:14}}><button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button><button onClick={save} disabled={busy} style={{...btnPrimary,flex:1,opacity:busy?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Crea"}</button></div>
+      <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+    </EcoModal>
+  );
+}
+
+function VoceForm({ data, onClose, onSaved }){
+  const voce=data.voce||{}; const isEdit=!!voce.id;
+  const [f,setF]=useState({importo:(voce.importo!=null?voce.importo:""),descrizione:voce.descrizione||"",stato:voce.stato||"da_pagare"});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  async function save(){
+    if(busy) return; setBusy(true); setErr("");
+    const payload={importo:(f.importo===""||f.importo==null)?0:Number(f.importo)||0,descrizione:f.descrizione.trim()||null,stato:f.stato};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("eco_voce").update(payload).eq("id",voce.id)); }
+    else { ({ error }=await supabase.from("eco_voce").insert({...payload,promo_id:data.promoId})); }
+    setBusy(false); if(error){ setErr(error.message); return; } onSaved();
+  }
+  return (
+    <EcoModal title={isEdit?"Modifica voce":"Nuova voce"} onClose={onClose}>
+      <label style={lbl}>Importo (€)</label>
+      <input type="number" step="0.01" value={f.importo} onChange={e=>set("importo",e.target.value)} style={inp}/>
+      <label style={lbl}>Descrizione (allocazione)</label>
+      <input value={f.descrizione} onChange={e=>set("descrizione",e.target.value)} placeholder="Es. DJ Matteo Fiaschi / rimborso benzina" style={inp}/>
+      <label style={lbl}>Stato rimborso</label>
+      <select value={f.stato} onChange={e=>set("stato",e.target.value)} style={inp}><option value="pagato">Pagato</option><option value="da_pagare">Da pagare</option><option value="no_nota_spesa">No nota spesa</option></select>
+      {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+      <div style={{display:"flex",gap:8,marginTop:14}}><button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button><button onClick={save} disabled={busy} style={{...btnPrimary,flex:1,opacity:busy?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Aggiungi"}</button></div>
+      <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+    </EcoModal>
+  );
+}
+
+function CashForm({ cash, onClose, onSaved }){
+  const isEdit=!!cash.id;
+  const [f,setF]=useState({persona:cash.persona||"",importo:(cash.importo!=null?cash.importo:""),stato:cash.stato||"da_ritirare",nota:cash.nota||""});
+  const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+  const set=(k,v)=>setF(o=>({...o,[k]:v}));
+  async function save(){
+    if(busy) return; setBusy(true); setErr("");
+    const payload={persona:f.persona.trim()||null,importo:(f.importo===""||f.importo==null)?0:Number(f.importo)||0,stato:f.stato,nota:f.nota.trim()||null};
+    let error;
+    if(isEdit){ ({ error }=await supabase.from("eco_cash").update(payload).eq("id",cash.id)); }
+    else { ({ error }=await supabase.from("eco_cash").insert(payload)); }
+    setBusy(false); if(error){ setErr(error.message); return; } onSaved();
+  }
+  return (
+    <EcoModal title={isEdit?"Modifica cash":"Nuovo cash"} onClose={onClose}>
+      <label style={lbl}>Persona</label>
+      <input value={f.persona} onChange={e=>set("persona",e.target.value)} placeholder="Es. Riccardo Brunori" style={inp}/>
+      <label style={lbl}>Importo (€)</label>
+      <input type="number" step="0.01" value={f.importo} onChange={e=>set("importo",e.target.value)} style={inp}/>
+      <label style={lbl}>Stato</label>
+      <select value={f.stato} onChange={e=>set("stato",e.target.value)} style={inp}><option value="da_ritirare">Da ritirare</option><option value="ritiro_in_pari">Ritiro in pari</option></select>
+      <label style={lbl}>Nota</label>
+      <input value={f.nota} onChange={e=>set("nota",e.target.value)} placeholder="Es. Da Gallipoli / Season 26" style={inp}/>
+      {err?<p style={{color:"#d33",fontSize:13,margin:"8px 2px 0"}}>{err}</p>:null}
+      <div style={{display:"flex",gap:8,marginTop:14}}><button onClick={onClose} style={{...btnGhost,flex:1}}>Annulla</button><button onClick={save} disabled={busy} style={{...btnPrimary,flex:1,opacity:busy?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>{busy&&<Loader2 size={16} className="spin"/>} {isEdit?"Salva":"Aggiungi"}</button></div>
+      <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+    </EcoModal>
   );
 }
 
