@@ -1842,7 +1842,7 @@ function Info({ rows }){ return <div style={{...card,padding:0,overflow:"hidden"
     <span style={{fontSize:13,color:C.mut}}>{r[0]}</span><span style={{fontSize:13.5,color:C.text,fontWeight:600}}>{r[1]}</span></div>))}</div>; }
 function PercorsoStaff({ stadio, desktop }){
   const cur=(stadio===undefined||stadio===null||stadio==="")?-1:Number(stadio);
-  if(desktop){
+  if(true){
     return (
       <div style={{...card,overflowX:"auto"}}>
         <div style={{display:"flex",minWidth:PERCORSO_STEPS.length*126}}>
