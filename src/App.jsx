@@ -235,7 +235,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   const closeNotif=()=>{ setNotifClosing(true); setTimeout(()=>{ setNotifOpen(false); setNotifClosing(false); },210); };
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
   const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
-    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} myPunti={myPunti} novita={novita} impost={impost} vita={vita}/>
+    : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} myPunti={myPunti} novita={novita} impost={impost} vita={vita} goTab={setTab}/>
     : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : tab==="premi" ? <SPremi me={me} myPunti={myPunti} riscatti={riscatti} reloadRiscatti={loadRiscatti}/>
@@ -289,28 +289,79 @@ function NotifRow({ color, title, sub, onClick }){
   </button>;
 }
 
-function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, myPunti, novita, impost, vita }){
-  const [openAvviso,setOpenAvviso]=useState(null); const [clAll,setClAll]=useState(false);
-  const upcoming=events.slice(0,6);
+function SectionHead({ Ic, title, link, onLink }){
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",margin:"0 0 12px"}}>
+    <div style={{display:"flex",alignItems:"center",gap:8}}>{Ic && <Ic size={17} color={C.primary}/>}<span style={{...head,fontSize:13,fontWeight:800,color:C.text,textTransform:"uppercase",letterSpacing:.9}}>{title}</span></div>
+    {link && <button onClick={onLink} style={{border:"none",background:"transparent",cursor:"pointer",color:C.primary,fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:3,padding:0}}>{link}<ChevronRight size={15}/></button>}
+  </div>;
+}
+function HeroChip({ Ic, big, small }){
+  return <div style={{flex:1,minWidth:104,border:`1px solid ${C.border}`,borderRadius:13,padding:"10px 12px",display:"flex",alignItems:"center",gap:9,background:C.surface}}>
+    <Ic size={17} color={C.primary}/>
+    <div style={{minWidth:0}}><div style={{fontWeight:800,fontSize:13.5,color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{big}</div><div style={{fontSize:11,color:C.mut}}>{small}</div></div>
+  </div>;
+}
+function NovitaHomeModal({ n, onClose }){
+  const col=C.accent;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",overflow:"hidden"}}>
+        <div style={{height:90,background:`linear-gradient(135deg,${col},${C.primary})`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+          <Sparkles size={30} color="#fff"/>
+          <button onClick={onClose} style={{...iconBtn,position:"absolute",top:10,right:10,background:"rgba(255,255,255,0.2)",borderRadius:20}}><X size={20} color="#fff"/></button>
+        </div>
+        <div style={{padding:20}}>
+          {n.tag && <span style={{fontSize:10,fontWeight:800,color:"#fff",background:col,borderRadius:999,padding:"3px 11px",textTransform:"uppercase",letterSpacing:.5}}>{n.tag}</span>}
+          <h3 style={{...head,fontSize:22,fontWeight:800,margin:"10px 0 4px"}}>{n.titolo}</h3>
+          <div style={{fontSize:11.5,color:C.mut,marginBottom:10}}>{fdate(n.created_at)}</div>
+          {n.corpo && <p style={{margin:0,fontSize:14.5,color:C.text,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{n.corpo}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, conferma, myPunti, novita, impost, vita, goTab }){
+  const desktop=useMedia("(min-width:760px)");
+  const [openAvviso,setOpenAvviso]=useState(null); const [novOpen,setNovOpen]=useState(null);
+  const upcoming=events.slice(0,8);
   const bannerComs=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]);
   const P=Number(myPunti)||0;
   let lvlIdx=0; LEVELS.forEach((l,i)=>{ if(P>=l[0]) lvlIdx=i; });
   const lvl=LEVELS[lvlIdx]; const nextL=LEVELS[lvlIdx+1];
   const prog=nextL?Math.min(100,Math.round((P-lvl[0])/(nextL[0]-lvl[0])*100)):100;
+  const ini=((me.nome||" ")[0]+(me.cognome||" ")[0]).toUpperCase();
+  const badge=me.foto_badge?supabase.storage.from("badge").getPublicUrl(me.foto_badge).data.publicUrl:null;
+  const dd=v=>{ if(!v) return ["",""]; const d=new Date(v); return [String(d.getDate()).padStart(2,"0"), d.toLocaleDateString("it-IT",{month:"short"}).toUpperCase().replace(".","")]; };
   return (
-    <div style={{padding:"16px 16px 28px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-        <div>
-          <p style={{margin:0,color:C.mut,fontSize:13}}>Ciao,</p>
-          <h1 style={{...head,fontSize:30,fontWeight:800,margin:"1px 0 3px"}}>{me.nome}</h1>
-          <p style={{margin:0,color:C.mut,fontSize:12.5}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p>
+    <div style={{maxWidth:desktop?1000:640,margin:"0 auto",padding:desktop?"20px 20px 44px":"16px 16px 28px"}}>
+      <div style={{...card,padding:0,overflow:"hidden",marginBottom:16,display:"flex",flexDirection:desktop?"row":"column"}}>
+        <div style={{flex:1,padding:desktop?"22px 24px":"18px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{position:"relative",flexShrink:0}}>
+              <div style={{width:66,height:66,borderRadius:33,overflow:"hidden",background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",...head,fontSize:22,fontWeight:800,color:C.primary}}>{badge?<img src={badge} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:ini}</div>
+              <span style={{position:"absolute",right:2,bottom:2,width:14,height:14,borderRadius:7,background:C.success,border:"2px solid #fff"}}/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <p style={{margin:0,color:C.mut,fontSize:13}}>Ciao,</p>
+              <h1 style={{...head,fontSize:desktop?30:26,fontWeight:800,margin:"0 0 2px"}}>{me.nome}</h1>
+              <p style={{margin:0,color:C.mut,fontSize:12.5}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:6,background:C.accentSoft,borderRadius:999,padding:"6px 12px",alignSelf:"flex-start"}}><Trophy size={14} color={C.accent}/><span style={{...head,fontWeight:800,fontSize:14,color:C.accent}}>{P}</span></div>
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:16,flexWrap:"wrap"}}>
+            <HeroChip Ic={Star} big={lvl[1]} small={P+" punti"}/>
+            <HeroChip Ic={Calendar} big={upcoming.length+" eventi"} small="in programma"/>
+            <HeroChip Ic={Users} big={rlabel(me.ruolo)} small={isUff?"Ufficio":"Staff"}/>
+          </div>
+          {isUff && <button onClick={openAdmin} style={{...btnPrimary,width:"100%",marginTop:16,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"13px 18px"}}><span style={{display:"flex",alignItems:"center",gap:8}}><Shield size={17}/> Pannello Admin</span><ChevronRight size={18}/></button>}
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:6,background:C.accentSoft,borderRadius:999,padding:"6px 11px"}}>
-          <Trophy size={14} color={C.accent}/><span style={{...head,fontWeight:700,fontSize:14,color:C.accent}}>{myPunti}</span>
-        </div>
+        {desktop && <div style={{width:300,minHeight:220,background:"linear-gradient(140deg,#255FF0,#18C7D0)",display:"flex",alignItems:"flex-end",padding:22}}>
+          <span style={{...head,color:"#fff",fontWeight:900,fontSize:27,lineHeight:1.02,fontStyle:"italic"}}>GOOD PEOPLE<br/>BETTER<br/>SUMMERS</span>
+        </div>}
       </div>
 
-      {bannerComs.length>0 && <div style={{marginBottom:18,display:"flex",flexDirection:"column",gap:10}}>
+      {bannerComs.length>0 && <div style={{marginBottom:20,display:"flex",flexDirection:"column",gap:10}}>
         {bannerComs.map(bc=>(
           <div key={bc.id} style={{background:C.amberSoft,border:"1px solid #f4d9a6",borderRadius:16,padding:14}}>
             <button onClick={()=>setOpenAvviso(bc)} style={{width:"100%",textAlign:"left",background:"transparent",border:"none",cursor:"pointer",padding:0,display:"flex",gap:9}}>
@@ -324,57 +375,76 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
             <button onClick={()=>conferma(bc.id)} style={{...btnPrimary,width:"100%",marginTop:11,background:C.amber,color:"#1a1206"}}>Ho letto e confermo</button>
           </div>))}
       </div>}
-      {isUff && <button onClick={openAdmin} style={{...btnPrimary,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"12px 0"}}>
-        <Shield size={17}/> Pannello Admin</button>}
 
-      <h3 style={sect}>Aftermovie Estate 2026</h3>
-      <button onClick={()=>{ const u=(impost||{}).aftermovie_url; if(u) window.open(u,"_blank"); }} style={{position:"relative",width:"100%",height:190,borderRadius:18,overflow:"hidden",marginBottom:24,background:"linear-gradient(130deg,#7170F1,#255FF0 55%,#18C7D0)",display:"flex",alignItems:"center",justifyContent:"center",border:"none",padding:0,cursor:(impost&&impost.aftermovie_url)?"pointer":"default"}}>
-        <div style={{width:58,height:58,borderRadius:30,background:"rgba(255,255,255,0.92)",display:"flex",alignItems:"center",justifyContent:"center"}}><Play size={24} color={C.primary} style={{marginLeft:3}}/></div>
-        <div style={{position:"absolute",left:14,bottom:12,right:14,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{...head,color:"#fff",fontWeight:700,fontSize:18}}>{(impost&&impost.aftermovie_titolo)||"Rivivi l'estate"}</span>
+      <SectionHead Ic={Play} title="Aftermovie Estate 2026"/>
+      <button onClick={()=>{ const u=(impost||{}).aftermovie_url; if(u) window.open(u,"_blank"); }} style={{position:"relative",width:"100%",height:desktop?240:186,borderRadius:20,overflow:"hidden",marginBottom:26,background:"linear-gradient(125deg,#7170F1 0%,#255FF0 45%,#18C7D0 100%)",border:"none",padding:0,cursor:(impost&&impost.aftermovie_url)?"pointer":"default",display:"block"}}>
+        <div style={{position:"absolute",left:22,top:0,bottom:0,display:"flex",alignItems:"center",maxWidth:"58%"}}>
+          <span style={{...head,color:"#fff",fontWeight:900,fontSize:desktop?32:23,lineHeight:1.03,textAlign:"left"}}>{((impost&&impost.aftermovie_titolo)||"Rivivi la nostra estate").toUpperCase()}</span>
         </div>
+        <div style={{position:"absolute",top:"50%",right:desktop?"22%":"12%",transform:"translateY(-50%)",width:66,height:66,borderRadius:33,background:"rgba(255,255,255,0.92)",display:"flex",alignItems:"center",justifyContent:"center"}}><Play size={27} color={C.primary} style={{marginLeft:4}}/></div>
+        <div style={{position:"absolute",right:18,bottom:14,textAlign:"right"}}><div style={{...head,color:"#fff",fontWeight:800,fontSize:14,letterSpacing:1}}>INVIBE</div><div style={{color:"rgba(255,255,255,0.85)",fontSize:11,letterSpacing:1}}>SUMMER 2026</div></div>
       </button>
 
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:11}}>
-        <h3 style={{...sect,margin:0}}>Prossimi eventi</h3>
-      </div>
+      <SectionHead Ic={Calendar} title="Prossimi eventi" link={upcoming.length?"Vedi tutti":null} onLink={()=>goTab&&goTab("eventi")}/>
       {upcoming.length===0
-        ? <div style={{...card,color:C.mut,fontSize:13,marginBottom:24}}>Nessun evento in programma. Arriverà un avviso quando ce ne sarà uno.</div>
-        : <div style={{display:"flex",gap:11,overflowX:"auto",paddingBottom:6,marginBottom:24}}>
-            {upcoming.map(e=>{ const cat=CAT[e.categoria]||CAT.NOTTE_EVENTO; return (
-              <button key={e.id} onClick={()=>open(e.id)} style={{flex:"0 0 200px",textAlign:"left",cursor:"pointer",background:C.surface,border:`1px solid ${C.border}`,borderRadius:15,padding:0,overflow:"hidden"}}>
-                <div style={{height:6,background:cat.color}}/>
-                <div style={{padding:13}}>
-                  <span style={{fontSize:11,fontWeight:700,color:cat.color}}>{cat.label}</span>
-                  <div style={{...head,fontSize:17,fontWeight:700,margin:"3px 0 7px",color:C.text}}>{e.titolo}</div>
-                  <div style={{fontSize:12,color:C.mut,display:"flex",alignItems:"center",gap:5}}><Clock size={12}/> {fdate(e.inizio)}</div>
-                  {e.luogo && <div style={{fontSize:12,color:C.mut,display:"flex",alignItems:"center",gap:5,marginTop:3}}><MapPin size={12}/> {e.luogo}</div>}
+        ? <div style={{...card,color:C.mut,fontSize:13,marginBottom:26}}>Nessun evento in programma. Arriverà un avviso quando ce ne sarà uno.</div>
+        : <div style={{display:"flex",gap:13,overflowX:"auto",paddingBottom:8,marginBottom:26}}>
+            {upcoming.map(e=>{ const cat=CAT[e.categoria]||CAT.NOTTE_EVENTO; const dt=dd(e.inizio); return (
+              <button key={e.id} onClick={()=>open(e.id)} style={{flex:"0 0 232px",textAlign:"left",cursor:"pointer",background:C.surface,border:`1px solid ${C.border}`,borderRadius:16,padding:0,overflow:"hidden"}}>
+                <div style={{height:98,background:`linear-gradient(135deg,${cat.color},${C.accent})`,position:"relative"}}>
+                  <div style={{position:"absolute",top:10,left:10,background:"#fff",borderRadius:11,padding:"5px 0",textAlign:"center",minWidth:48,boxShadow:"0 4px 10px rgba(0,0,0,0.14)"}}>
+                    <div style={{...head,fontSize:18,fontWeight:900,color:C.primary,lineHeight:1}}>{dt[0]}</div>
+                    <div style={{fontSize:9,fontWeight:800,color:C.primary,letterSpacing:.5}}>{dt[1]}</div>
+                  </div>
+                  <span style={{position:"absolute",bottom:8,left:12,fontSize:11,fontWeight:800,color:"#fff",textShadow:"0 1px 3px rgba(0,0,0,0.3)"}}>{cat.label}</span>
+                </div>
+                <div style={{padding:13,display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:8}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{...head,fontSize:16,fontWeight:800,margin:"0 0 6px",color:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.titolo}</div>
+                    <div style={{fontSize:12,color:C.mut,display:"flex",alignItems:"center",gap:5}}><Clock size={12}/> {fdate(e.inizio)}</div>
+                    {e.luogo && <div style={{fontSize:12,color:C.mut,display:"flex",alignItems:"center",gap:5,marginTop:3}}><MapPin size={12}/> {e.luogo}</div>}
+                  </div>
+                  <div style={{width:32,height:32,borderRadius:10,background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><ChevronRight size={17} color={C.primary}/></div>
                 </div>
               </button>); })}
           </div>}
 
       {(novita||[]).length>0 && <>
-        <h3 style={sect}>Novità</h3>
-        <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          {novita.map((n,i)=><News key={n.id} tag={n.tag||"Novità"} color={i%2?C.primary:C.accent} title={n.titolo} body={n.corpo||""} time={fdate(n.created_at)}/>)}
+        <SectionHead Ic={Sparkles} title="Novità"/>
+        <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:26}}>
+          {novita.map((n,i)=>{ const col=i%2?C.primary:C.accent; return (
+            <button key={n.id} onClick={()=>setNovOpen(n)} style={{...card,padding:0,overflow:"hidden",display:"flex",alignItems:"stretch",textAlign:"left",cursor:"pointer"}}>
+              <div style={{width:92,flexShrink:0,background:`linear-gradient(135deg,${col},${C.accent})`,display:"flex",alignItems:"center",justifyContent:"center"}}><Sparkles size={26} color="#fff"/></div>
+              <div style={{flex:1,padding:"13px 15px",minWidth:0}}>
+                <span style={{fontSize:10,fontWeight:800,color:"#fff",background:col,borderRadius:999,padding:"3px 10px",textTransform:"uppercase",letterSpacing:.5}}>{n.tag||"Novità"}</span>
+                <div style={{...head,fontSize:17,fontWeight:800,margin:"8px 0 3px"}}>{n.titolo}</div>
+                {n.corpo && <p style={{margin:0,fontSize:12.5,color:C.mut,lineHeight:1.4,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{n.corpo}</p>}
+                <div style={{fontSize:11,color:C.mut,marginTop:6}}>{fdate(n.created_at)}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",paddingRight:14}}><ChevronRight size={20} color={C.mut}/></div>
+            </button>); })}
         </div>
       </>}
-      <h3 style={{...sect,marginTop:24}}>Il tuo livello</h3>
-      <div style={{...card,marginBottom:14}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
-          <span style={{...head,fontSize:20,fontWeight:800,color:C.primary}}>{lvl[1]}</span>
-          <span style={{...head,fontSize:16,fontWeight:800,color:C.accent}}>{P} punti</span>
+
+      <SectionHead Ic={Star} title="Il tuo livello"/>
+      <div style={{display:desktop?"grid":"flex",gridTemplateColumns:desktop?"1.4fr 1fr":undefined,flexDirection:desktop?undefined:"column",gap:14,marginBottom:26}}>
+        <div style={{...card,margin:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:11}}><span style={{...head,fontSize:23,fontWeight:900,color:C.primary}}>{lvl[1]}</span><span style={{...head,fontSize:18,fontWeight:900,color:C.accent}}>{P} punti</span></div>
+          <div style={{height:11,borderRadius:6,background:"#eef1f6",overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:`linear-gradient(90deg,${C.primary},${C.accent})`,borderRadius:6}}/></div>
+          <p style={{fontSize:12,color:C.mut,margin:"9px 0 0"}}>{nextL?`Ti mancano ${Math.max(0,nextL[0]-P)} punti per il livello "${nextL[1]}"`:"Hai raggiunto il livello massimo!"}</p>
         </div>
-        <div style={{height:9,borderRadius:5,background:"#eef1f6",overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:`linear-gradient(90deg,${C.primary},${C.accent})`,borderRadius:5}}/></div>
-        <p style={{fontSize:12,color:C.mut,margin:"7px 0 0"}}>{nextL?`Ti mancano ${Math.max(0,nextL[0]-P)} punti per il livello "${nextL[1]}"`:"Hai raggiunto il livello massimo!"}</p>
+        <div style={{...card,margin:0,display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:38,height:38,borderRadius:11,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Trophy size={19} color={C.accent}/></div><span style={{...head,fontSize:16,fontWeight:800}}>Ottieni più punti</span></div>
+          <p style={{margin:0,fontSize:12.5,color:C.mut,lineHeight:1.4}}>Partecipa agli eventi, conferma gli avvisi e completa il profilo per salire di livello.</p>
+          <button onClick={()=>goTab&&goTab("premi")} style={{...btnGhost,alignSelf:"flex-start",fontSize:13,padding:"8px 14px",marginTop:2,display:"flex",alignItems:"center",gap:5}}>Scopri come <ChevronRight size={15}/></button>
+        </div>
       </div>
-      <h3 style={{...sect,marginTop:24}}>Il tuo percorso in Invibe</h3>
-      <PercorsoStaff stadio={me.percorso_stadio}/>
-      {(vita||[]).length>0 && <>
-        <h3 style={{...sect,marginTop:24}}>Vita da staff</h3>
-        <VitaStaff items={vita}/>
-      </>}
+
+      <SectionHead Ic={GraduationCap} title="Il tuo percorso in Invibe"/>
+      <PercorsoStaff stadio={me.percorso_stadio} desktop={desktop}/>
+      {(vita||[]).length>0 && <div style={{marginTop:26}}><SectionHead Ic={Heart} title="Vita da staff"/><VitaStaff items={vita}/></div>}
       {openAvviso && <AvvisoModal c={openAvviso} confermato={!!letto[openAvviso.id]} onConferma={()=>conferma(openAvviso.id)} onClose={()=>setOpenAvviso(null)}/>}
+      {novOpen && <NovitaHomeModal n={novOpen} onClose={()=>setNovOpen(null)}/>}
     </div>
   );
 }
@@ -1770,8 +1840,26 @@ function Line({ icon, t }){ return <div style={{display:"flex",alignItems:"cente
 function Info({ rows }){ return <div style={{...card,padding:0,overflow:"hidden"}}>{rows.map((r,i)=>(
   <div key={r[0]} style={{display:"flex",justifyContent:"space-between",padding:"12px 15px",borderTop:i?`1px solid ${C.border}`:"none"}}>
     <span style={{fontSize:13,color:C.mut}}>{r[0]}</span><span style={{fontSize:13.5,color:C.text,fontWeight:600}}>{r[1]}</span></div>))}</div>; }
-function PercorsoStaff({ stadio }){
+function PercorsoStaff({ stadio, desktop }){
   const cur=(stadio===undefined||stadio===null||stadio==="")?-1:Number(stadio);
+  if(desktop){
+    return (
+      <div style={{...card,overflowX:"auto"}}>
+        <div style={{display:"flex",minWidth:PERCORSO_STEPS.length*126}}>
+          {PERCORSO_STEPS.map(([t,d],i)=>{ const done=i<cur, isCur=i===cur; const col=done?C.success:isCur?C.primary:"#dfe4ec"; return (
+            <div key={i} style={{flex:1,minWidth:118,position:"relative",paddingTop:6}}>
+              {i<PERCORSO_STEPS.length-1 && <div style={{position:"absolute",top:19,left:"50%",width:"100%",height:2,background:i<cur?C.success:"#e6eaf1"}}/>}
+              <div style={{position:"relative",width:26,height:26,borderRadius:13,background:col,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",zIndex:1}}>{done&&<Check size={14} color="#fff"/>}{isCur&&<div style={{width:9,height:9,borderRadius:5,background:"#fff"}}/>}</div>
+              <div style={{textAlign:"center",padding:"10px 6px 0"}}>
+                <div style={{fontWeight:700,fontSize:12.5,color:(done||isCur)?C.text:C.mut}}>{t}</div>
+                {isCur && <span style={{display:"inline-block",fontSize:9,fontWeight:800,color:"#fff",background:C.primary,borderRadius:6,padding:"2px 7px",margin:"3px 0"}}>SEI QUI</span>}
+                <div style={{fontSize:10.5,color:C.mut,marginTop:2,lineHeight:1.3}}>{d}</div>
+              </div>
+            </div>); })}
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={card}>
       {PERCORSO_STEPS.map(([t,d],i)=>{ const done=i<cur, isCur=i===cur; const col=done?C.success:isCur?C.primary:C.border; return (
