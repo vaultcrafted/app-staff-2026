@@ -64,7 +64,7 @@ export default function App(){
 
 function Splash(){
   return <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:C.primary}}>
-    <img src={LOGO_W} alt="INVIBE" style={{height:32}}/>
+    <img src={LOGO_W} alt="INVIBE" style={{height:96}}/>
   </div>;
 }
 
@@ -83,7 +83,7 @@ function Login({ onDone }){
   }
   return (
     <div style={{height:"100%",display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",background:C.primary,padding:24}}>
-      <img src={LOGO_W} alt="INVIBE" style={{height:36}}/>
+      <img src={LOGO_W} alt="INVIBE" style={{height:104}}/>
       <p style={{color:"#cfe0ff",margin:"0 0 26px",fontSize:15}}>Area staff</p>
       <div style={{width:"100%",maxWidth:360,background:C.surface,borderRadius:20,padding:22}}>
         <label style={lbl}>Username</label>
@@ -146,7 +146,7 @@ function Onboarding({ me, onDone, onLogout }){
     <div style={{minHeight:"100%",background:C.bg,display:"flex",flexDirection:"column"}}>
       <div style={{background:C.primary,flexShrink:0}}>
         <div style={{maxWidth:640,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <img src={LOGO_W} alt="INVIBE" style={{height:22}}/>
+          <img src={LOGO_W} alt="INVIBE" style={{height:34}}/>
           <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
         </div>
       </div>
@@ -243,7 +243,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       <div style={{background:C.primary,flexShrink:0}}>
         <div style={{maxWidth:1080,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
-          <img src={LOGO_W} alt="INVIBE" style={{height:22,display:"block"}}/>
+          <img src={LOGO_W} alt="INVIBE" style={{height:34,display:"block"}}/>
           {desktop && <div style={{display:"flex",gap:6}}>
             {NAV.map(([k,Ic,l])=>{ const on=tab===k; return (
               <button key={k} onClick={()=>{setTab(k);setOpenEvent(null);}} style={{display:"flex",alignItems:"center",gap:7,border:"none",cursor:"pointer",borderRadius:9,padding:"8px 14px",background:on?"rgba(255,255,255,0.18)":"transparent",color:"#fff",fontFamily:"Barlow",fontWeight:on?700:600,fontSize:14}}>
@@ -523,7 +523,7 @@ function Admin({ me, onLogout, onBack }){
     <div style={{background:C.bg,display:"flex",flexDirection:desktop?"row":"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
       {desktop &&
       <div style={{width:92,background:C.sidebar,flexShrink:0,display:"flex",flexDirection:"column",alignItems:"center",paddingTop:16}}>
-        <img src={LOGO_W} alt="INVIBE" style={{width:34,marginBottom:20}}/>
+        <img src={LOGO_W} alt="INVIBE" style={{width:48,marginBottom:20}}/>
         <div style={{flex:1,display:"flex",flexDirection:"column",gap:6,width:92}}>
           {NAV.map(([k,Ic,l])=>{ const on=section===k; return (
             <button key={k} onClick={()=>setSection(k)} style={{width:92,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"10px 0",color:on?"#fff":C.sidebarMut}}><Ic size={21}/><span style={{fontSize:10.5,fontWeight:on?700:500}}>{l}</span></button>); })}
@@ -536,7 +536,7 @@ function Admin({ me, onLogout, onBack }){
             <button onClick={onBack} style={iconBtn}><ChevronLeft size={20} color="#fff"/></button>
             <Shield size={18} color="#fff"/><span style={{...head,fontWeight:700,fontSize:18,color:"#fff"}}>Pannello Admin</span>
           </div>
-          <img src={LOGO_W} alt="INVIBE" style={{height:20}}/>
+          <img src={LOGO_W} alt="INVIBE" style={{height:30}}/>
         </div>
         <div style={{flex:1,overflowY:"auto",padding:20,paddingBottom:desktop?20:96}}>{body}</div>
       </div>
