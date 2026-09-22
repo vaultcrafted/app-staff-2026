@@ -1008,7 +1008,7 @@ function ComForm({ me, com, onClose, onSaved }){
     else { ({ error }=await supabase.from("comunicazioni").insert({...payload,created_by:me.id})); }
     setBusy(false);
     if(error){ setErr(error.message); return; }
-    if(!isEdit){ try{ await supabase.functions.invoke("send-push",{body:{title:f.titolo.trim(),body:(f.corpo.trim()||"Nuova comunicazione")}}); }catch(e){} }
+    if(!isEdit){ try{ await supabase.functions.invoke("send-push",{body:{title:f.titolo.trim(),body:(f.corpo.trim()||"Nuovo avviso dall'ufficio"),tag:"avviso"}}); }catch(e){} }
     onSaved();
   }
   return (
@@ -1655,7 +1655,7 @@ function EventForm({ me, ev, onClose, onSaved }){
     else { ({ error }=await supabase.from("eventi").insert({...payload,created_by:me.id})); }
     setBusy(false);
     if(error){ setErr(error.message); return; }
-    if(!isEdit){ try{ await supabase.functions.invoke("send-push",{body:{title:"Nuovo evento in programma",body:f.titolo.trim()+(f.luogo.trim()?(" · "+f.luogo.trim()):"")}}); }catch(e){} }
+    if(!isEdit){ try{ await supabase.functions.invoke("send-push",{body:{title:"Nuovo evento: "+f.titolo.trim(),body:(f.luogo.trim()?f.luogo.trim()+" · ":"")+"apri per dire se ci sarai",tag:"evento"}}); }catch(e){} }
     onSaved();
   }
   return (

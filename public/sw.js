@@ -4,8 +4,10 @@ self.addEventListener("push", (event) => {
   const title = data.title || "INVIBE";
   const options = {
     body: data.body || "",
-    icon: "/logo.png",
-    badge: "/logo.png",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: data.tag || "invibe",
+    renotify: true,
     data: { url: data.url || "/" },
   };
   event.waitUntil(self.registration.showNotification(title, options));
