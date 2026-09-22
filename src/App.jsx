@@ -125,7 +125,7 @@ function OField({label,value,onChange,type,req,valid,placeholder,hint,options}){
 }
 
 function Onboarding({ me, onDone, onLogout }){
-  const [f,setF]=useState({nascita:me.nascita||"",sesso:me.sesso||"",citta:me.citta||"",indirizzo:me.indirizzo||"",codice_fiscale:me.codice_fiscale||"",email:me.email||"",telefono:me.telefono||"",instagram:me.instagram||"",professione:me.professione||"",aspirazioni:me.aspirazioni||""});
+  const [f,setF]=useState({nascita:me.nascita||"",sesso:me.sesso||"",citta:me.citta||"",indirizzo:me.indirizzo||"",codice_fiscale:me.codice_fiscale||"",email:me.email||"",telefono:me.telefono||"",instagram:me.instagram||"",professione:me.professione||"",aspirazioni:me.aspirazioni||"",cap:me.cap||"",provincia:me.provincia||""});
   const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   const cf=(f.codice_fiscale||"").trim().toUpperCase();
@@ -137,7 +137,7 @@ function Onboarding({ me, onDone, onLogout }){
   const ok=mancanti===0;
   async function completa(){
     if(!ok||busy) return; setBusy(true); setErr("");
-    const { error }=await supabase.from("staff_anagrafica").update({nascita:f.nascita||null,sesso:f.sesso||null,citta:f.citta.trim()||null,indirizzo:f.indirizzo.trim()||null,codice_fiscale:cf||null,email:f.email.trim()||null,telefono:f.telefono.trim()||null,instagram:f.instagram.trim()||null,professione:f.professione.trim()||null,aspirazioni:f.aspirazioni.trim()||null,profilo_completato:true}).eq("id",me.id);
+    const { error }=await supabase.from("staff_anagrafica").update({nascita:f.nascita||null,sesso:f.sesso||null,citta:f.citta.trim()||null,indirizzo:f.indirizzo.trim()||null,codice_fiscale:cf||null,email:f.email.trim()||null,telefono:f.telefono.trim()||null,instagram:f.instagram.trim()||null,professione:f.professione.trim()||null,aspirazioni:f.aspirazioni.trim()||null,cap:f.cap.trim()||null,provincia:f.provincia.trim()||null,profilo_completato:true}).eq("id",me.id);
     setBusy(false);
     if(error){ setErr(error.message); return; }
     onDone();
@@ -167,6 +167,8 @@ function Onboarding({ me, onDone, onLogout }){
             <OField label="Sesso" value={f.sesso} onChange={v=>set("sesso",v)} req valid={!!f.sesso} options={["Uomo","Donna"]}/>
             <OField label="Città" value={f.citta} onChange={v=>set("citta",v)} req valid={!!f.citta.trim()} placeholder="Es. Torino"/>
             <OField label="Indirizzo di casa" value={f.indirizzo} onChange={v=>set("indirizzo",v)} req valid={!!f.indirizzo.trim()} placeholder="Via, numero, città"/>
+            <OField label="CAP" value={f.cap} onChange={v=>set("cap",v)} valid={true}/>
+            <OField label="Provincia (sigla)" value={f.provincia} onChange={v=>set("provincia",v.toUpperCase())} valid={true} placeholder="Es. TO"/>
             <OField label="Codice fiscale" value={f.codice_fiscale} onChange={v=>set("codice_fiscale",v.toUpperCase())} req valid={cfOk} hint="Deve avere 16 caratteri" placeholder="16 caratteri"/>
           </div>
           <div style={{...card,marginTop:14}}>
@@ -438,7 +440,7 @@ function SProfilo({ me, onLogout, reload }){
   const [pw,setPw]=useState(false);
   const [notif,setNotif]=useState(typeof Notification!=="undefined" && Notification.permission==="granted");
   const pub=[["Ruolo",rlabel(me.ruolo)],["Zona",me.zona||"—"],["Anno d'ingresso",me.anno_ingresso||"—"],["Turni fatti",me.settimane_2025??"—"],["Taglia divisa",me.taglia_maglia||"—"]];
-  const priv=[["Email",me.email||"—"],["Telefono",me.telefono||"—"],["Città",me.citta||"—"],["Indirizzo",me.indirizzo||"—"],["Codice fiscale",me.codice_fiscale||"—"]];
+  const priv=[["Email",me.email||"—"],["Telefono",me.telefono||"—"],["Città",me.citta||"—"],["Indirizzo",me.indirizzo||"—"],["Codice fiscale",me.codice_fiscale||"—"],["CAP",me.cap||"—"],["Provincia",me.provincia||"—"]];
   const ini=((me.nome||" ")[0]+(me.cognome||" ")[0]).toUpperCase();
   return (
     <div style={{padding:"16px 16px 28px"}}>
@@ -451,6 +453,7 @@ function SProfilo({ me, onLogout, reload }){
       <button onClick={()=>setPw(true)} style={{...btnGhost,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>Cambia password</button>
       <h3 style={sect}>Informazioni</h3><Info rows={pub}/>
       <h3 style={{...sect,marginTop:18}}>Dati personali · solo tu e l'ufficio</h3><Info rows={priv}/>
+      {(me.att_antincendio||me.att_primo_soccorso||me.att_blsd||me.att_libretto) && <><h3 style={{...sect,marginTop:18}}>Attestati</h3><Info rows={[["Antincendio",me.att_antincendio],["Primo soccorso",me.att_primo_soccorso],["BLSD",me.att_blsd],["Libretto assicurativo",me.att_libretto]].filter(r=>r[1])}/></>}
       <button onClick={onLogout} style={{...btnGhost,width:"100%",marginTop:20,color:"#d33",borderColor:"#f0c4c4",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><LogOut size={17}/> Esci</button>
       {pw && <PasswordEdit me={me} onClose={()=>setPw(false)}/>}
     </div>
@@ -1127,7 +1130,7 @@ function StaffDetail({ id, onBack }){
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   async function save(){
     setBusy(true); setMsg("");
-    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","punti_bonus","attivo"];
+    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","cap","provincia","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","punti_bonus","attivo"];
     const p={}; keys.forEach(k=>{ p[k]=(f[k]===""?null:f[k]); });
     if(p.anno_ingresso) p.anno_ingresso=parseInt(p.anno_ingresso)||null;
     p.percorso_stadio=(p.percorso_stadio===""||p.percorso_stadio==null)?null:parseInt(p.percorso_stadio);
@@ -1161,6 +1164,8 @@ function StaffDetail({ id, onBack }){
         <OField label="Sesso" value={f.sesso||""} onChange={v=>set("sesso",v)} valid={true} options={["Uomo","Donna"]}/>
         <OField label="Città" value={f.citta||""} onChange={v=>set("citta",v)} valid={true}/>
         <OField label="Indirizzo" value={f.indirizzo||""} onChange={v=>set("indirizzo",v)} valid={true}/>
+        <OField label="CAP" value={f.cap||""} onChange={v=>set("cap",v)} valid={true}/>
+        <OField label="Provincia" value={f.provincia||""} onChange={v=>set("provincia",v)} valid={true}/>
         <OField label="Codice fiscale" value={f.codice_fiscale||""} onChange={v=>set("codice_fiscale",v.toUpperCase())} valid={true}/>
         <OField label="Email" value={f.email||""} onChange={v=>set("email",v)} valid={true}/>
         <OField label="Telefono" value={f.telefono||""} onChange={v=>set("telefono",v)} valid={true}/>
