@@ -153,7 +153,11 @@ function Onboarding({ me, onDone, onLogout }){
       <div style={{flex:1,overflowY:"auto"}}>
         <div style={{maxWidth:640,margin:"0 auto",width:"100%",padding:"18px 16px 40px"}}>
           <h1 style={{...head,fontSize:28,fontWeight:800,margin:"6px 0 6px"}}>Benvenut{isDonna(me.sesso)?"a":"o"}, {me.nome}!</h1>
-          <p style={{color:C.mut,fontSize:14,lineHeight:1.5,margin:"0 0 16px"}}>Prima di entrare, controlla che i dati siano giusti e completa quelli mancanti. Ti serve una volta sola.</p>
+          <p style={{color:C.mut,fontSize:14,lineHeight:1.5,margin:"0 0 12px"}}>Prima di entrare, controlla che i dati siano giusti e completa quelli mancanti. Ti serve una volta sola.</p>
+          <div style={{background:"#fdecec",border:"1px solid #f3b4b4",borderRadius:12,padding:"11px 14px",marginBottom:16,display:"flex",gap:9,alignItems:"flex-start"}}>
+            <span style={{fontSize:17,lineHeight:1.1}}>⚠️</span>
+            <div style={{fontSize:13,color:"#a12727",fontWeight:600,lineHeight:1.4}}>Attenzione: azione irreversibile. Una volta salvati, questi dati <b>non potrai più modificarli</b> da solo — solo l'ufficio potrà correggerli. Controlla bene prima di confermare.</div>
+          </div>
           <div style={{background:ok?C.successSoft:C.amberSoft,border:`1px solid ${ok?"rgba(34,179,107,0.3)":"#f4d9a6"}`,borderRadius:12,padding:"10px 13px",marginBottom:18,fontSize:13.5,fontWeight:700,color:ok?"#177a4a":"#8a5a12"}}>
             {ok?"Tutto pronto — puoi entrare.":`Mancano ${mancanti} ${mancanti===1?"dato":"dati"} da sistemare.`}
           </div>
@@ -368,42 +372,12 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
         <div style={{height:9,borderRadius:5,background:"#eef1f6",overflow:"hidden"}}><div style={{width:prog+"%",height:"100%",background:`linear-gradient(90deg,${C.primary},${C.accent})`,borderRadius:5}}/></div>
         <p style={{fontSize:12,color:C.mut,margin:"7px 0 0"}}>{nextL?`Ti mancano ${Math.max(0,nextL[0]-P)} punti per il livello "${nextL[1]}"`:"Hai raggiunto il livello massimo!"}</p>
       </div>
-      <h3 style={sect}>Classifica</h3>
-      <div style={card}>
-        {top.length===0 ? <span style={{color:C.mut,fontSize:13}}>Ancora nessun punto assegnato. Partecipa agli eventi!</span>
-         : top.map((r,i)=>{ const meRow=r.staff_id===me.id; return (
-           <div key={r.staff_id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none"}}>
-             <span style={{...head,fontSize:16,fontWeight:800,color:i<3?C.accent:C.mut,width:24}}>{i+1}</span>
-             <span style={{flex:1,fontWeight:meRow?700:600,fontSize:14,color:meRow?C.primary:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}{meRow?" (tu)":""}</span>
-             <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
-           </div>); })}
-        {myRank>5 && <div style={{borderTop:`1px solid ${C.border}`,marginTop:6,paddingTop:8,fontSize:13,color:C.mut}}>Tu sei <b style={{color:C.primary}}>N°{myRank}</b> con {P} punti</div>}
-        {cl.length>5 && <button onClick={()=>setClAll(true)} style={{...btnGhost,width:"100%",marginTop:12,fontSize:13}}>Classifica completa</button>}
-      </div>
       <h3 style={{...sect,marginTop:24}}>Il tuo percorso in Invibe</h3>
       <PercorsoStaff stadio={me.percorso_stadio}/>
       {(vita||[]).length>0 && <>
         <h3 style={{...sect,marginTop:24}}>Vita da staff</h3>
         <VitaStaff items={vita}/>
       </>}
-      {clAll && (
-        <div onMouseDown={e=>{ if(e.target===e.currentTarget) setClAll(false); }} style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>Classifica completa</h3>
-              <button onClick={()=>setClAll(false)} style={iconBtn}><X size={22} color={C.mut}/></button>
-            </div>
-            <div style={{overflowY:"auto"}}>
-              {cl.map((r,i)=>{ const meRow=r.staff_id===me.id; return (
-                <div key={r.staff_id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none"}}>
-                  <span style={{...head,fontSize:15,fontWeight:800,color:i<3?C.accent:C.mut,width:26}}>{i+1}</span>
-                  <span style={{flex:1,fontWeight:meRow?700:600,fontSize:14,color:meRow?C.primary:C.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.nome} {r.cognome}{meRow?" (tu)":""}</span>
-                  <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
-                </div>); })}
-            </div>
-          </div>
-        </div>
-      )}
       {openAvviso && <AvvisoModal c={openAvviso} confermato={!!letto[openAvviso.id]} onConferma={()=>conferma(openAvviso.id)} onClose={()=>setOpenAvviso(null)}/>}
     </div>
   );
@@ -479,13 +453,11 @@ function SProfilo({ me, onLogout, reload }){
         <div><h1 style={{...head,fontSize:23,fontWeight:800,margin:0}}>{me.nome} {me.cognome}</h1>
           <p style={{margin:"2px 0 0",color:C.mut,fontSize:13}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p></div>
       </div>
-      <button onClick={()=>setEdit(true)} style={{...btnPrimary,width:"100%",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:7}}><Pencil size={16}/> Modifica profilo</button>
       <button onClick={async()=>{ const ok=await attivaNotifiche(me); setNotif(ok||notif); }} style={{...btnGhost,width:"100%",marginBottom:10,display:"flex",alignItems:"center",justifyContent:"center",gap:8,color:notif?C.success:C.text,borderColor:notif?"#bfe6cf":C.border}}><Bell size={16}/> {notif?"Notifiche attive":"Attiva notifiche"}</button>
       <button onClick={()=>setPw(true)} style={{...btnGhost,width:"100%",marginBottom:18,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>Cambia password</button>
       <h3 style={sect}>Informazioni</h3><Info rows={pub}/>
       <h3 style={{...sect,marginTop:18}}>Dati personali · solo tu e l'ufficio</h3><Info rows={priv}/>
       <button onClick={onLogout} style={{...btnGhost,width:"100%",marginTop:20,color:"#d33",borderColor:"#f0c4c4",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><LogOut size={17}/> Esci</button>
-      {edit && <ProfiloEdit me={me} onClose={()=>setEdit(false)} onSaved={()=>{setEdit(false);reload();}}/>}
       {pw && <PasswordEdit me={me} onClose={()=>setPw(false)}/>}
     </div>
   );
@@ -530,11 +502,6 @@ function EventDetail({ ev, part, onA, onBack, me }){
           </div>
         )}
         {rs && <p style={{fontSize:12.5,color:C.mut,margin:"12px 2px 0"}}>{rs==="ci_saro"?"Risposta salvata. L'ufficio confermerà la presenza alla serata.":"Ok, l'ufficio è stato avvisato."}</p>}
-      </div>
-      <div style={{margin:"22px 16px 0"}}>
-        <p style={{...head,fontSize:15,fontWeight:700,margin:"0 0 8px"}}>La tua valutazione dell'evento</p>
-        <Stars value={voto} onSelect={n=>{ setVoto(n); saveVal(n,commento); }}/>
-        <textarea value={commento} onChange={e=>setCommento(e.target.value)} onBlur={()=>saveVal(voto,commento)} rows={2} placeholder="Un commento (facoltativo)" style={{...inp,resize:"vertical",marginTop:8}}/>
       </div>
     </div>
   );
@@ -790,11 +757,9 @@ function EventoPresenze({ ev, onBack }){
                 {p.rsvp==="ci_saro" && <div style={{fontSize:12,color:C.mut,marginTop:3}}>Parte da: {p.citta_partenza||"—"} · Macchina: {macchinaTxt(p.ha_macchina)}</div>}
               </div>
               {p.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:p.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="Non ci sarò"/>:<Tag c={C.mut} bg="#f2f5fb" t="Nessuna risposta"/>}
-              <button onClick={()=>setValOpen(s)} style={{border:`1px solid ${C.border}`,background:C.surface,cursor:"pointer",borderRadius:9,padding:"7px 10px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,color:v.voto?C.amber:C.mut,display:"flex",alignItems:"center",gap:5}}><Star size={14} color={C.amber} fill={v.voto?C.amber:"none"}/>{v.voto?v.voto:"Valuta"}</button>
               <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
             </div>); })}
          </div>}
-      {valOpen && <ValutaStaff ev={ev} staff={valOpen} existing={valut[valOpen.id]||{}} onClose={()=>setValOpen(null)} onSaved={()=>{setValOpen(null);load();}}/>}
     </div>
   );
 }
@@ -1254,9 +1219,21 @@ function SPremi({ me, myPunti, riscatti, reloadRiscatti }){
   return (
     <div style={{padding:"16px 16px 24px"}}>
       <h1 style={{...head,fontSize:26,fontWeight:800,margin:"4px 0 12px"}}>Premi</h1>
-      <div style={{...card,display:"flex",alignItems:"center",gap:12,marginBottom:18}}>
-        <div style={{width:44,height:44,borderRadius:12,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center"}}><Trophy size={20} color={C.accent}/></div>
-        <div><div style={{...head,fontSize:24,fontWeight:800,color:C.accent,lineHeight:1}}>{P}</div><div style={{fontSize:12,color:C.mut,marginTop:2}}>punti totali · più ne accumuli, più premi sblocchi</div></div>
+      <div style={{...card,marginBottom:18}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{width:54,height:54,borderRadius:15,background:C.accentSoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><Trophy size={26} color={C.accent}/></div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{...head,fontSize:40,fontWeight:900,color:C.accent,lineHeight:1}}>{P}</div>
+            <div style={{fontSize:12.5,color:C.mut,marginTop:2}}>punti totali · più ne accumuli, più premi sblocchi</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:5,marginTop:16}}>
+          {LEVELS.map((l,i)=>{ const on=P>=l[0]; return (
+            <div key={i} style={{flex:1,textAlign:"center"}}>
+              <div style={{height:6,borderRadius:3,background:on?C.accent:"#e6e9f0",marginBottom:5}}/>
+              <div style={{fontSize:9.5,fontWeight:on?800:600,color:on?C.accent:C.mut,whiteSpace:"nowrap"}}>{l[1]}</div>
+            </div>); })}
+        </div>
       </div>
       {premi===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
        : premi.length===0 ? <div style={{...card,color:C.mut,fontSize:14}}>Nessun premio al momento.</div>
