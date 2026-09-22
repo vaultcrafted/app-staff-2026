@@ -1588,9 +1588,9 @@ function PasswordEdit({ me, onClose }){
 }
 
 function AdminStats(){
-  const [d,setD]=useState(null);
+  const [d,setD]=useState(null); const [roleOpen,setRoleOpen]=useState(null);
   useEffect(()=>{ (async()=>{
-    const { data:staff }=await supabase.from("staff_anagrafica").select("ruolo,attivo");
+    const { data:staff }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo,attivo");
     const { count:nEventi }=await supabase.from("eventi").select("*",{count:"exact",head:true});
     const { count:nComun }=await supabase.from("comunicazioni").select("*",{count:"exact",head:true});
     const { data:part }=await supabase.from("eventi_partecipazioni").select("rsvp,presente");
@@ -1599,7 +1599,7 @@ function AdminStats(){
     const perRuolo={}; sa.forEach(x=>{ const r=x.ruolo||"—"; perRuolo[r]=(perRuolo[r]||0)+1; });
     setD({ tot:sa.length, att:sa.filter(x=>x.attivo).length, nEventi:nEventi||0, nComun:nComun||0,
       perRuolo, nPres:(part||[]).filter(x=>x.presente===true).length, nSi:(part||[]).filter(x=>x.rsvp==="ci_saro").length,
-      top:(cl||[]).slice(0,5) });
+      top:(cl||[]).slice(0,5), lista:sa });
   })(); },[]);
   if(!d) return <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>;
   const ruoliArr=Object.entries(d.perRuolo).sort((a,b)=>b[1]-a[1]);
@@ -1616,10 +1616,10 @@ function AdminStats(){
       <div style={{...card,marginBottom:14}}>
         <h3 style={{...sect,marginTop:0}}>Staff per ruolo</h3>
         {ruoliArr.map(([r,n])=>{ const w=Math.round(n/maxN*100); return (
-          <div key={r} style={{marginBottom:9}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}><span>{rlabel(r)}</span><span style={{fontWeight:700}}>{n}</span></div>
+          <button key={r} onClick={()=>setRoleOpen(r)} style={{width:"100%",textAlign:"left",background:"transparent",border:"none",cursor:"pointer",padding:0,marginBottom:9,display:"block"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:3}}><span style={{display:"flex",alignItems:"center",gap:4}}>{rlabel(r)} <ChevronRight size={13} color={C.mut}/></span><span style={{fontWeight:700}}>{n}</span></div>
             <div style={{height:8,borderRadius:4,background:"#eef1f6",overflow:"hidden"}}><div style={{width:w+"%",height:"100%",background:C.primary,borderRadius:4}}/></div>
-          </div>); })}
+          </button>); })}
       </div>
       <div style={{...card,marginBottom:14}}>
         <h3 style={{...sect,marginTop:0}}>Partecipazione</h3>
@@ -1637,6 +1637,23 @@ function AdminStats(){
             <span style={{...head,fontWeight:800,color:C.accent}}>{r.punti}</span>
           </div>))}
       </div>
+      {roleOpen && (
+        <div onMouseDown={e=>{ if(e.target===e.currentTarget) setRoleOpen(null); }} style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20,maxHeight:"80vh",display:"flex",flexDirection:"column"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <h3 style={{...head,fontSize:20,fontWeight:800,margin:0}}>{rlabel(roleOpen)}</h3>
+              <button onClick={()=>setRoleOpen(null)} style={iconBtn}><X size={22} color={C.mut}/></button>
+            </div>
+            <div style={{overflowY:"auto"}}>
+              {(d.lista||[]).filter(x=>(x.ruolo||"—")===roleOpen).sort((a,b)=>(a.cognome||"").localeCompare(b.cognome||"")).map((x,i)=>(
+                <div key={x.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderTop:i?`1px solid ${C.border}`:"none"}}>
+                  <span style={{flex:1,fontWeight:600,fontSize:14}}>{x.nome} {x.cognome}</span>
+                  {x.attivo?<Tag c={C.success} bg={C.successSoft} t="Attivo"/>:<Tag c={C.mut} bg="#eef1f6" t="Inattivo"/>}
+                </div>))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
