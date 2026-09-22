@@ -229,14 +229,16 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
   }
   async function loadRiscatti(){ const { data }=await supabase.from("riscatti").select("*").eq("staff_id",me.id).order("created_at",{ascending:false}); setRiscatti(data||[]); }
   async function conferma(cid){ setLetto(l=>({...l,[cid]:true})); await supabase.from("comunicazioni_letture").upsert({comunicazione_id:cid,staff_id:me.id,confermata_at:new Date().toISOString()},{onConflict:"comunicazione_id,staff_id"}); }
+  const [valutaEv,setValutaEv]=useState(null);
   const ev=events.find(e=>e.id===openEvent);
   const [notifOpen,setNotifOpen]=useState(false); const [notifClosing,setNotifClosing]=useState(false); const [avvisoOpen,setAvvisoOpen]=useState(null);
   const unread=(coms||[]).filter(c=>c.richiede_conferma && !letto[c.id]).length;
   const closeNotif=()=>{ setNotifClosing(true); setTimeout(()=>{ setNotifOpen(false); setNotifClosing(false); },210); };
   const NAV=[["home",Home,"Home"],["eventi",Calendar,"Eventi"],["avvisi",MessageSquare,"Avvisi"],["premi",Gift,"Premi"],["profilo",User,"Profilo"]];
-  const content = ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
+  const content = valutaEv ? <ValutaSerata ev={valutaEv} me={me} onBack={()=>setValutaEv(null)}/>
+    : ev ? <EventDetail ev={ev} part={rsvp[ev.id]||{}} onA={answer} onBack={()=>setOpenEvent(null)} me={me}/>
     : tab==="home" ? <SHome me={me} events={events} rsvp={rsvp} onA={answer} open={setOpenEvent} isUff={isUff} openAdmin={openAdmin} coms={coms} letto={letto} conferma={conferma} myPunti={myPunti} novita={novita} impost={impost} vita={vita} goTab={setTab}/>
-    : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent}/>
+    : tab==="eventi" ? <SEventi events={events} rsvp={rsvp} open={setOpenEvent} me={me} onValuta={setValutaEv}/>
     : tab==="avvisi" ? <SAvvisi coms={coms} letto={letto} conferma={conferma}/>
     : tab==="premi" ? <SPremi me={me} myPunti={myPunti} riscatti={riscatti} reloadRiscatti={loadRiscatti}/>
     : <SProfilo me={me} onLogout={onLogout} reload={reload}/>;
@@ -450,14 +452,19 @@ function SHome({ me, events, rsvp, onA, open, isUff, openAdmin, coms, letto, con
   );
 }
 
-function SEventi({ events, rsvp, open }){
+function SEventi({ events, rsvp, open, me, onValuta }){
+  const canVal=me&&(me.ruolo==="CA"||me.ruolo==="CM");
   return (
     <div style={{padding:"16px 16px 24px"}}>
       <h1 style={{...head,fontSize:26,fontWeight:800,margin:"4px 0 3px"}}>Eventi</h1>
       <p style={{margin:"0 0 18px",color:C.mut,fontSize:13}}>Metti se ci sarai.</p>
       {events.length===0 ? <div style={{...card,color:C.mut,fontSize:13}}>Nessun evento al momento.</div>
       : <div style={{display:"flex",flexDirection:"column",gap:11}}>
-          {events.map(e=><ERow key={e.id} e={e} state={rsvp[e.id]} onClick={()=>open(e.id)}/>)}
+          {events.map(e=>{ const past=e.inizio && new Date(e.inizio)<new Date(); return (
+            <div key={e.id}>
+              <ERow e={e} state={rsvp[e.id]} onClick={()=>open(e.id)}/>
+              {canVal && past && <button onClick={()=>onValuta(e)} style={{...btnGhost,width:"100%",marginTop:6,display:"flex",alignItems:"center",justifyContent:"center",gap:7,fontSize:13,color:C.primary,borderColor:C.primary}}><Star size={15}/> Valuta lo staff della serata</button>}
+            </div>); })}
         </div>}
     </div>
   );
@@ -527,6 +534,51 @@ function SProfilo({ me, onLogout, reload }){
       {(me.att_antincendio||me.att_primo_soccorso||me.att_blsd||me.att_libretto) && <><h3 style={{...sect,marginTop:18}}>Attestati</h3><Info rows={[["Antincendio",me.att_antincendio],["Primo soccorso",me.att_primo_soccorso],["BLSD",me.att_blsd],["Libretto assicurativo",me.att_libretto]].filter(r=>r[1])}/></>}
       <button onClick={onLogout} style={{...btnGhost,width:"100%",marginTop:20,color:"#d33",borderColor:"#f0c4c4",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><LogOut size={17}/> Esci</button>
       {pw && <PasswordEdit me={me} onClose={()=>setPw(false)}/>}
+    </div>
+  );
+}
+
+function ValutaSerata({ ev, me, onBack }){
+  const [staff,setStaff]=useState(null); const [vals,setVals]=useState({}); const [saving,setSaving]=useState(false); const [msg,setMsg]=useState("");
+  async function load(){
+    const { data:pp }=await supabase.from("eventi_partecipazioni").select("staff_id").eq("evento_id",ev.id).eq("presente",true);
+    const ids=(pp||[]).map(p=>p.staff_id).filter(id=>id!==me.id);
+    let st=[]; if(ids.length){ const { data }=await supabase.from("staff_anagrafica").select("id,nome,cognome,ruolo").in("id",ids).order("cognome"); st=data||[]; }
+    setStaff(st);
+    const { data:vv }=await supabase.from("valutazioni").select("id,staff_id,voto,commento").eq("evento_id",ev.id).eq("tipo","ca_su_staff").eq("valutatore_id",me.id);
+    const vm={}; (vv||[]).forEach(x=>vm[x.staff_id]={id:x.id,voto:x.voto,commento:x.commento||""}); setVals(vm);
+  }
+  useEffect(()=>{ load(); },[ev.id]);
+  const all=staff||[]; const done=all.filter(s=>(vals[s.id]||{}).voto>0).length; const manca=all.length-done;
+  async function salva(){
+    if(saving) return; setSaving(true); setMsg("");
+    for(const s of all){ const v=vals[s.id]||{}; if(!v.voto) continue;
+      if(v.id){ await supabase.from("valutazioni").update({voto:v.voto,commento:(v.commento||"").trim()||null}).eq("id",v.id); }
+      else { await supabase.from("valutazioni").insert({evento_id:ev.id,staff_id:s.id,valutatore_id:me.id,tipo:"ca_su_staff",voto:v.voto,commento:(v.commento||"").trim()||null}); } }
+    await load(); setSaving(false); setMsg("Salvato"); setTimeout(()=>setMsg(""),2500);
+  }
+  return (
+    <div style={{padding:"16px 16px 28px"}}>
+      <button onClick={onBack} style={{display:"flex",alignItems:"center",gap:4,background:"transparent",border:"none",cursor:"pointer",color:C.mut,fontSize:14,padding:"2px 0 10px",fontFamily:"Barlow"}}><ChevronLeft size={18}/> Eventi</button>
+      <h1 style={{...head,fontSize:24,fontWeight:800,margin:"0 0 2px"}}>Valuta lo staff</h1>
+      <p style={{margin:"0 0 6px",color:C.mut,fontSize:13}}>{ev.titolo} · {fdate(ev.inizio)}</p>
+      <p style={{margin:"0 0 16px",fontSize:12.5,fontWeight:700,color:manca>0?C.amber:C.success}}>{all.length===0?"Nessuno staff segnato presente a questa serata.":manca>0?`${done}/${all.length} valutati · mancano ${manca}`:`Tutti valutati (${all.length})`}</p>
+      {staff===null ? <div style={{...card,color:C.mut,fontSize:13}}>Carico…</div>
+       : all.length===0 ? <div style={{...card,color:C.mut,fontSize:13}}>Nessun presente da valutare. L'ufficio segna i presenti nel dettaglio evento.</div>
+       : <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {all.map(s=>{ const v=vals[s.id]||{}; const miss=!(v.voto>0); return (
+            <div key={s.id} style={{...card,borderLeft:`4px solid ${miss?C.amber:C.success}`}}>
+              <div style={{fontWeight:700,fontSize:15}}>{s.nome} {s.cognome}</div>
+              <div style={{fontSize:12,color:C.mut,marginBottom:8}}>{rlabel(s.ruolo)}</div>
+              <Stars value={v.voto} onSelect={n=>setVals(m=>({...m,[s.id]:{...(m[s.id]||{}),voto:n}}))}/>
+              <textarea value={v.commento||""} onChange={e=>setVals(m=>({...m,[s.id]:{...(m[s.id]||{}),commento:e.target.value}}))} rows={2} placeholder="Commento su questo staff" style={{...inp,resize:"vertical",marginTop:10}}/>
+            </div>); })}
+         </div>}
+      {all.length>0 && <div style={{position:"sticky",bottom:0,paddingTop:12,marginTop:6,background:`linear-gradient(180deg,transparent, ${C.bg} 40%)`}}>
+        <button onClick={salva} disabled={saving} style={{...btnPrimary,width:"100%",padding:"13px 0",opacity:saving?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontSize:15}}>{saving&&<Loader2 size={16} className="spin"/>} Salva valutazioni</button>
+        {msg && <p style={{textAlign:"center",color:C.success,fontSize:13,fontWeight:700,margin:"8px 0 0"}}>{msg}</p>}
+        <style>{`.spin{animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}`}</style>
+      </div>}
     </div>
   );
 }
@@ -761,6 +813,7 @@ function EventoPresenze({ ev, onBack }){
   const [part,setPart]=useState({});
   const [valut,setValut]=useState({});
   const [valOpen,setValOpen]=useState(null);
+  const [caVals,setCaVals]=useState({}); const [caNames,setCaNames]=useState({}); const [caDetail,setCaDetail]=useState(null);
   const [filter,setFilter]=useState("tutti");
   const [q,setQ]=useState("");
   async function load(){
@@ -770,6 +823,10 @@ function EventoPresenze({ ev, onBack }){
     const m={}; (pp||[]).forEach(p=>m[p.staff_id]={rsvp:p.rsvp,presente:p.presente,citta_partenza:p.citta_partenza,ha_macchina:p.ha_macchina,motivo_assenza:p.motivo_assenza}); setPart(m);
     const { data:vv }=await supabase.from("valutazioni").select("staff_id,voto,commento").eq("evento_id",ev.id).eq("tipo","uff_su_staff");
     const vm={}; (vv||[]).forEach(x=>vm[x.staff_id]={voto:x.voto,commento:x.commento}); setValut(vm);
+    const { data:cv }=await supabase.from("valutazioni").select("staff_id,valutatore_id,voto,commento").eq("evento_id",ev.id).eq("tipo","ca_su_staff");
+    const cm={}; (cv||[]).forEach(x=>{ (cm[x.staff_id]=cm[x.staff_id]||[]).push(x); }); setCaVals(cm);
+    const vids=[...new Set((cv||[]).map(x=>x.valutatore_id))].filter(Boolean);
+    if(vids.length){ const { data:vn }=await supabase.from("staff_anagrafica").select("id,nome,cognome").in("id",vids); const nm={}; (vn||[]).forEach(x=>nm[x.id]=x.nome+" "+x.cognome); setCaNames(nm); } else setCaNames({});
   }
   useEffect(()=>{ load(); },[ev.id]);
   async function togglePresente(sid){
@@ -833,9 +890,22 @@ function EventoPresenze({ ev, onBack }){
                 {p.rsvp==="non_ci_saro" && p.motivo_assenza && <div style={{fontSize:12,color:C.mut,marginTop:3,fontStyle:"italic"}}>Motivo: {p.motivo_assenza}</div>}
               </div>
               {p.rsvp==="ci_saro"?<Tag c={C.success} bg={C.successSoft} t="Ci sarò"/>:p.rsvp==="non_ci_saro"?<Tag c={C.mut} bg="#eef1f6" t="Non ci sarò"/>:<Tag c={C.mut} bg="#f2f5fb" t="Nessuna risposta"/>}
+              {(caVals[s.id]||[]).length>0 && (()=>{ const arr=caVals[s.id]; const avg=arr.reduce((a,x)=>a+(x.voto||0),0)/arr.length; return <button onClick={()=>setCaDetail({staff:s,arr})} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 10px",background:C.amberSoft,color:"#8a5a00",fontWeight:800,fontSize:12.5,display:"flex",alignItems:"center",gap:5}}><Star size={14} color={C.amber} fill={C.amber}/> {avg.toFixed(1)} · {arr.length}</button>; })()}
               <button onClick={()=>togglePresente(s.id)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontFamily:"Barlow",fontWeight:700,fontSize:12.5,background:pres?C.success:"#eef1f6",color:pres?"#fff":C.mut,display:"flex",alignItems:"center",gap:5}}>{pres?<><Check size={14}/> Presente</>:"Segna presente"}</button>
             </div>); })}
          </div>}
+      {caDetail && <div style={{position:"fixed",inset:0,background:"rgba(10,20,40,0.45)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:16,zIndex:100,overflowY:"auto"}} onMouseDown={e=>{ if(e.target===e.currentTarget) setCaDetail(null); }}>
+        <div onClick={e=>e.stopPropagation()} style={{background:C.surface,borderRadius:18,width:"100%",maxWidth:460,margin:"24px 0",padding:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h3 style={{...head,fontSize:19,fontWeight:800,margin:0}}>Valutazioni · {caDetail.staff.nome} {caDetail.staff.cognome}</h3><button onClick={()=>setCaDetail(null)} style={iconBtn}><X size={20} color={C.mut}/></button></div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {caDetail.arr.map((x,i)=>(<div key={i} style={{borderTop:i?`1px solid ${C.border}`:"none",paddingTop:i?12:0}}>
+              <div style={{fontSize:12.5,color:C.mut,marginBottom:4}}>{caNames[x.valutatore_id]||"—"}</div>
+              <div style={{display:"flex",gap:2,marginBottom:x.commento?4:0}}>{[1,2,3,4,5].map(n=><Star key={n} size={16} color={C.amber} fill={n<=(x.voto||0)?C.amber:"none"}/>)}</div>
+              {x.commento && <div style={{fontSize:13,color:C.text,lineHeight:1.4}}>{x.commento}</div>}
+            </div>))}
+          </div>
+        </div>
+      </div>}
     </div>
   );
 }
