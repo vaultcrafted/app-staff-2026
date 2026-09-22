@@ -445,7 +445,7 @@ function SProfilo({ me, onLogout, reload }){
   return (
     <div style={{padding:"16px 16px 28px"}}>
       <div style={{display:"flex",alignItems:"center",gap:13,marginBottom:16}}>
-        <div style={{width:62,height:62,borderRadius:31,background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",...head,fontSize:22,fontWeight:800,color:C.primary}}>{ini}</div>
+        <div style={{width:62,height:62,borderRadius:31,overflow:"hidden",background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",...head,fontSize:22,fontWeight:800,color:C.primary}}>{me.foto_badge ? <img src={supabase.storage.from("badge").getPublicUrl(me.foto_badge).data.publicUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : ini}</div>
         <div><h1 style={{...head,fontSize:23,fontWeight:800,margin:0}}>{me.nome} {me.cognome}</h1>
           <p style={{margin:"2px 0 0",color:C.mut,fontSize:13}}>{rlabel(me.ruolo)}{me.zona?` · ${me.zona}`:""}</p></div>
       </div>
@@ -1113,6 +1113,8 @@ function StaffDetail({ id, onBack }){
   const [f,setF]=useState(null);
   const [note,setNote]=useState({potenziale:"",note:""});
   const [storico,setStorico]=useState([]);
+  const badgeRef=useRef(); const [badgeUp,setBadgeUp]=useState(false);
+  async function onBadge(e){ const file=e.target.files[0]; if(!file) return; setBadgeUp(true); const ext=(file.name.split(".").pop()||"jpg").toLowerCase(); const path=id+"_"+Date.now()+"."+ext; const up=await supabase.storage.from("badge").upload(path,file,{upsert:true,contentType:file.type||"image/jpeg"}); if(!up.error){ await supabase.from("staff_anagrafica").update({foto_badge:path}).eq("id",id); setF(o=>({...o,foto_badge:path})); } setBadgeUp(false); if(e.target) e.target.value=""; }
   const [busy,setBusy]=useState(false); const [msg,setMsg]=useState("");
   useEffect(()=>{ (async()=>{
     const { data:r }=await supabase.from("staff_anagrafica").select("*").eq("id",id).maybeSingle();
@@ -1130,7 +1132,7 @@ function StaffDetail({ id, onBack }){
   const set=(k,v)=>setF(o=>({...o,[k]:v}));
   async function save(){
     setBusy(true); setMsg("");
-    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","cap","provincia","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","punti_bonus","attivo"];
+    const keys=["nome","cognome","nascita","sesso","citta","indirizzo","cap","provincia","codice_fiscale","email","telefono","instagram","ruolo","zona","anno_ingresso","taglia_maglia","professione","aspirazioni","progetti_invibe","att_antincendio","att_primo_soccorso","att_blsd","att_libretto","percorso_stadio","punti_bonus","foto_badge","attivo"];
     const p={}; keys.forEach(k=>{ p[k]=(f[k]===""?null:f[k]); });
     if(p.anno_ingresso) p.anno_ingresso=parseInt(p.anno_ingresso)||null;
     p.percorso_stadio=(p.percorso_stadio===""||p.percorso_stadio==null)?null:parseInt(p.percorso_stadio);
@@ -1149,6 +1151,16 @@ function StaffDetail({ id, onBack }){
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap"}}>
         <h2 style={{...head,fontSize:22,fontWeight:800,margin:0,flex:1}}>{f.nome} {f.cognome}</h2>
         <button onClick={()=>set("attivo",!f.attivo)} style={{border:"none",cursor:"pointer",borderRadius:9,padding:"7px 12px",fontWeight:700,fontSize:12.5,fontFamily:"Barlow",background:f.attivo?C.successSoft:"#fdecec",color:f.attivo?C.success:"#d33"}}>{f.attivo?"Attivo":"Disattivato"}</button>
+      </div>
+      <div style={{...card,marginBottom:14,display:"flex",alignItems:"center",gap:14}}>
+        <div style={{width:64,height:64,borderRadius:14,overflow:"hidden",background:C.primarySoft,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          {f.foto_badge ? <img src={supabase.storage.from("badge").getPublicUrl(f.foto_badge).data.publicUrl} alt="badge" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : <User size={26} color={C.primary}/>}
+        </div>
+        <div style={{flex:1}}>
+          <h3 style={{...sect,marginTop:0,marginBottom:6}}>Foto badge</h3>
+          <input ref={badgeRef} type="file" accept="image/*" onChange={onBadge} style={{display:"none"}}/>
+          <button onClick={()=>badgeRef.current&&badgeRef.current.click()} disabled={badgeUp} style={{...btnGhost,fontSize:13,padding:"7px 12px"}}>{badgeUp?"Carico…":(f.foto_badge?"Cambia foto":"Carica foto")}</button>
+        </div>
       </div>
       <div style={{...card,marginBottom:14}}>
         <h3 style={{...sect,marginTop:0}}>Credenziali</h3>
