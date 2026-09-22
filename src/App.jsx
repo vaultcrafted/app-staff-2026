@@ -144,7 +144,7 @@ function Onboarding({ me, onDone, onLogout }){
   }
   return (
     <div style={{minHeight:"100%",background:C.bg,display:"flex",flexDirection:"column"}}>
-      <div style={{background:C.primary,flexShrink:0,paddingTop:"env(safe-area-inset-top,0px)"}}>
+      <div style={{background:C.primary,flexShrink:0}}>
         <div style={{maxWidth:640,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <img src={LOGO_W} alt="INVIBE" style={{height:22}}/>
           <button onClick={onLogout} style={iconBtn}><LogOut size={19} color="#cfe0ff"/></button>
@@ -242,7 +242,7 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
     : <SProfilo me={me} onLogout={onLogout} reload={reload}/>;
   return (
     <div style={{background:C.bg,display:"flex",flexDirection:"column",height:desktop?undefined:"100%",minHeight:desktop?"100%":undefined}}>
-      <div style={{background:C.primary,flexShrink:0,paddingTop:"env(safe-area-inset-top,0px)"}}>
+      <div style={{background:C.primary,flexShrink:0}}>
         <div style={{maxWidth:1080,margin:"0 auto",padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:16}}>
           <img src={LOGO_W} alt="INVIBE" style={{height:22,display:"block"}}/>
           {desktop && <div style={{display:"flex",gap:6}}>
@@ -257,9 +257,9 @@ function StaffApp({ me, onLogout, isUff, openAdmin, reload }){
         </div>
       </div>
       <div style={{flex:1,overflowY:"auto"}}>
-        <div style={{maxWidth:desktop?680:480,margin:"0 auto",width:"100%",paddingBottom:desktop?0:110}}>{content}</div>
+        <div style={{maxWidth:desktop?680:480,margin:"0 auto",width:"100%",paddingBottom:desktop?0:86}}>{content}</div>
       </div>
-      {!ev && !desktop && <nav style={{position:"fixed",bottom:0,left:0,right:0,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+      {!ev && !desktop && <nav style={{position:"fixed",bottom:0,left:0,right:0,height:64,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:50}}>
         {NAV.map(([k,Ic,l])=>{ const on=tab===k; return <button key={k} onClick={()=>setTab(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,paddingTop:9,color:on?C.primary:C.mut}}><Ic size={21} strokeWidth={on?2.4:1.9}/><span style={{fontSize:11,fontWeight:on?700:500}}>{l}</span></button>; })}
       </nav>}
       {notifOpen && (
@@ -605,17 +605,17 @@ function Admin({ me, onLogout, onBack }){
         <button onClick={onLogout} style={{...iconBtn,color:C.sidebarMut,display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"14px 0"}}><LogOut size={20}/><span style={{fontSize:10.5}}>Esci</span></button>
       </div>}
       <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
-        <div style={{background:C.primary,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 18px",minHeight:56,paddingTop:"env(safe-area-inset-top,0px)"}}>
+        <div style={{background:C.primary,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 18px",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:9,color:"#fff"}}>
             <button onClick={onBack} style={iconBtn}><ChevronLeft size={20} color="#fff"/></button>
             <Shield size={18} color="#fff"/><span style={{...head,fontWeight:700,fontSize:18,color:"#fff"}}>Pannello Admin</span>
           </div>
           <img src={LOGO_W} alt="INVIBE" style={{height:20}}/>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:20,paddingBottom:desktop?20:116}}>{body}</div>
+        <div style={{flex:1,overflowY:"auto",padding:20,paddingBottom:desktop?20:96}}>{body}</div>
       </div>
       {!desktop &&
-      <nav style={{position:"fixed",bottom:0,left:0,right:0,background:C.sidebar,display:"flex",borderTop:"1px solid rgba(255,255,255,0.08)",zIndex:50,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+      <nav style={{position:"fixed",bottom:0,left:0,right:0,background:C.sidebar,display:"flex",borderTop:"1px solid rgba(255,255,255,0.08)",zIndex:50}}>
         {NAV.map(([k,Ic,l])=>{ const on=section===k; return (
           <button key={k} onClick={()=>setSection(k)} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:on?"#fff":C.sidebarMut}}><Ic size={20}/><span style={{fontSize:10,fontWeight:on?700:500}}>{l}</span></button>); })}
         <button onClick={onLogout} style={{flex:1,border:"none",background:"transparent",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0",color:C.sidebarMut}}><LogOut size={20}/><span style={{fontSize:10}}>Esci</span></button>
